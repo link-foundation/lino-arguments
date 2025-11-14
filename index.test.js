@@ -1,7 +1,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
-import { writeFileSync, unlinkSync, existsSync } from 'fs';
-import { join } from 'path';
+import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   makeConfig,
   getenv,
