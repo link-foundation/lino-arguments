@@ -144,6 +144,9 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Install dependencies
+        run: bun install
+
       - name: Run tests
         run: bun test
 
@@ -160,6 +163,9 @@ jobs:
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+
+      - name: Install dependencies
+        run: deno install
 
       - name: Run tests
         run: deno test --allow-read
