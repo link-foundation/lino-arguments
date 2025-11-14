@@ -4,24 +4,390 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
 /**
- * lino-arguments - A setup of Links Notation Environment (lenv) + yargs
+ * lino-arguments - A unified configuration library
  *
- * This library provides a unified configuration approach that combines:
- * - .lenv files (using lino-env)
- * - Links notation format (using links-notation)
- * - Command-line arguments (using yargs)
+ * Combines Links Notation Environment (lenv), dotenvx, and yargs into a single
+ * easy-to-use configuration system with clear priority ordering.
+ *
+ * Priority (highest to lowest):
+ * 1. CLI arguments (manually entered options)
+ * 2. getenv defaults (from process.env, set by previous steps)
+ * 3. --configuration option (lenv file specified via CLI)
+ * 4. .lenv file (local environment overrides)
+ * 5. dotenvx/.env file (base configuration, DEPRECATED)
  */
+
+// ============================================================================
+// Case Conversion Utilities
+// ============================================================================
+
+/**
+ * Convert string to UPPER_CASE (for environment variables)
+ * @param {string} str - Input string
+ * @returns {string} UPPER_CASE string
+ */
+export function toUpperCase(str) {
+  // If already all uppercase, just replace separators
+  if (str === str.toUpperCase()) {
+    return str.replace(/[-\s]/g, '_');
+  }
+
+  return str
+    .replace(/([A-Z])/g, '_$1') // PascalCase/camelCase
+    .replace(/[-\s]/g, '_') // kebab-case/spaces
+    .toUpperCase()
+    .replace(/^_/, '') // Remove leading underscore
+    .replace(/__+/g, '_'); // Remove double underscores
+}
+
+/**
+ * Convert string to camelCase (for config object keys)
+ * @param {string} str - Input string
+ * @returns {string} camelCase string
+ */
+export function toCamelCase(str) {
+  return str
+    .toLowerCase()
+    .replace(/[-_\s]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ''))
+    .replace(/^[A-Z]/, (c) => c.toLowerCase());
+}
+
+/**
+ * Convert string to kebab-case (for CLI options)
+ * @param {string} str - Input string
+ * @returns {string} kebab-case string
+ */
+export function toKebabCase(str) {
+  // If already all uppercase, handle specially
+  if (str === str.toUpperCase() && str.includes('_')) {
+    return str.replace(/_/g, '-').toLowerCase();
+  }
+
+  return str
+    .replace(/([A-Z])/g, '-$1')
+    .replace(/[_\s]/g, '-')
+    .toLowerCase()
+    .replace(/^-/, '')
+    .replace(/--+/g, '-');
+}
+
+/**
+ * Convert string to snake_case
+ * @param {string} str - Input string
+ * @returns {string} snake_case string
+ */
+export function toSnakeCase(str) {
+  // If already all uppercase, just lowercase
+  if (str === str.toUpperCase() && str.includes('_')) {
+    return str.toLowerCase();
+  }
+
+  return str
+    .replace(/([A-Z])/g, '_$1')
+    .replace(/[-\s]/g, '_')
+    .toLowerCase()
+    .replace(/^_/, '')
+    .replace(/__+/g, '_');
+}
+
+/**
+ * Convert string to PascalCase
+ * @param {string} str - Input string
+ * @returns {string} PascalCase string
+ */
+export function toPascalCase(str) {
+  return str
+    .toLowerCase()
+    .replace(/[-_\s]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ''))
+    .replace(/^[a-z]/, (c) => c.toUpperCase());
+}
+
+// ============================================================================
+// Environment Variable Helper
+// ============================================================================
+
+/**
+ * Get environment variable with default value and case conversion
+ * Tries multiple case formats to find the variable
+ *
+ * @param {string} key - Variable name (any case format)
+ * @param {string|number|boolean} [defaultValue=''] - Default value if not found
+ * @returns {string|number|boolean} Environment variable value or default (preserves type of default)
+ *
+ * @example
+ * // Try to get API_KEY, apiKey, api-key, etc.
+ * const apiKey = getenv('apiKey', 'default-key');
+ * const port = getenv('PORT', 3000); // Returns number if env var is numeric
+ */
+export function getenv(key, defaultValue = '') {
+  // Try different case formats
+  const variants = [
+    key, // Original
+    toUpperCase(key), // UPPER_CASE
+    toCamelCase(key), // camelCase
+    toKebabCase(key), // kebab-case
+    toSnakeCase(key), // snake_case
+    toPascalCase(key), // PascalCase
+  ];
+
+  for (const variant of variants) {
+    if (process.env[variant] !== undefined) {
+      const value = process.env[variant];
+
+      // If default is a number, try to parse the env value as a number
+      if (typeof defaultValue === 'number') {
+        const parsed = Number(value);
+        return isNaN(parsed) ? defaultValue : parsed;
+      }
+
+      // If default is a boolean, try to parse the env value as a boolean
+      if (typeof defaultValue === 'boolean') {
+        if (value.toLowerCase() === 'true') {
+          return true;
+        }
+        if (value.toLowerCase() === 'false') {
+          return false;
+        }
+        return defaultValue;
+      }
+
+      // Otherwise return as string
+      return value;
+    }
+  }
+
+  return defaultValue;
+}
+
+// ============================================================================
+// Lino-env Loading Functions
+// ============================================================================
+
+/**
+ * Load environment configuration from a .lenv file
+ *
+ * @param {string} filePath - Path to the .lenv file (default: '.lenv')
+ * @returns {LinoEnv|null} LinoEnv instance with loaded data, or null if failed
+ */
+function loadLinoEnv(filePath = '.lenv') {
+  try {
+    const env = new LinoEnv(filePath);
+    env.read();
+    return env;
+  } catch (_error) {
+    return null;
+  }
+}
+
+/**
+ * Apply .lenv configuration to process.env with case conversion
+ * All values are stored as UPPER_CASE in process.env
+ *
+ * @param {string} filePath - Path to the .lenv file
+ * @param {Object} options - Options for applying configuration
+ * @param {boolean} options.override - Whether to override existing values (default: false)
+ * @param {boolean} options.quiet - Suppress output (default: false)
+ * @returns {Object} Object containing all loaded environment variables
+ */
+function applyLinoEnv(filePath = '.lenv', options = {}) {
+  const { override = false, quiet = false } = options;
+
+  try {
+    const env = loadLinoEnv(filePath);
+    if (!env) {
+      return {};
+    }
+
+    const envObject = env.toObject();
+    const loaded = {};
+
+    for (const [key, value] of Object.entries(envObject)) {
+      // Convert all keys to UPPER_CASE for process.env
+      const upperKey = toUpperCase(key);
+
+      if (override || !process.env[upperKey]) {
+        process.env[upperKey] = value;
+        loaded[upperKey] = value;
+      }
+    }
+
+    if (!quiet && Object.keys(loaded).length > 0) {
+      console.log(
+        `📝 Loaded ${Object.keys(loaded).length} variables from ${filePath}`
+      );
+    }
+
+    return loaded;
+  } catch (error) {
+    if (!quiet) {
+      console.error(`⚠️  Failed to load ${filePath}:`, error.message);
+    }
+    return {};
+  }
+}
+
+/**
+ * Load dotenvx configuration (DEPRECATED)
+ *
+ * @param {Object} options - Options to pass to dotenvx
+ * @param {boolean} options.quiet - Suppress warnings (default: false)
+ * @returns {Object} Result from dotenvx.config()
+ */
+async function loadDotenvx(options = {}) {
+  const { quiet = false } = options;
+
+  if (!quiet) {
+    console.warn(
+      '\x1b[33m⚠️  DEPRECATED: dotenvx/.env files are deprecated.\x1b[0m\n' +
+        '   Please use Links Notation (.lenv files) for environment configuration instead.\n' +
+        '   See: https://github.com/link-foundation/lino-env'
+    );
+  }
+
+  try {
+    const dotenvx = await import('@dotenvx/dotenvx');
+    return dotenvx.config({ ...options, quiet: true });
+  } catch (_error) {
+    if (!quiet) {
+      console.error('⚠️  dotenvx not installed, skipping .env loading');
+    }
+    return { parsed: {} };
+  }
+}
+
+// ============================================================================
+// Main Configuration Function
+// ============================================================================
+
+/**
+ * Create unified configuration from multiple sources
+ *
+ * Priority (highest to lowest):
+ * 1. CLI arguments (manually entered)
+ * 2. getenv defaults (from process.env)
+ * 3. --configuration flag (dynamic .lenv file)
+ * 4. .lenv file
+ * 5. dotenvx/.env file (DEPRECATED)
+ *
+ * @param {Object} config - Configuration object
+ * @param {Function} config.yargs - Yargs configuration function: (yargs, getenv) => yargs
+ * @param {Object} [config.lenv] - Lino-env configuration
+ * @param {boolean} [config.lenv.enabled=true] - Enable .lenv loading
+ * @param {string} [config.lenv.path='.lenv'] - Path to .lenv file
+ * @param {boolean} [config.lenv.override=true] - Override existing env vars
+ * @param {Object} [config.env] - Dotenvx/.env configuration (DEPRECATED)
+ * @param {boolean} [config.env.enabled=false] - Enable .env loading
+ * @param {Object} [config.getenv] - Getenv configuration
+ * @param {boolean} [config.getenv.enabled=true] - Enable getenv helper
+ * @param {string[]} [config.argv] - Custom argv to parse (default: process.argv)
+ * @returns {Object} Parsed configuration object with camelCase keys
+ *
+ * @example
+ * // Hero example (defaults)
+ * const config = makeConfig({
+ *   yargs: (yargs, getenv) => yargs
+ *     .option('port', { type: 'number', default: getenv('PORT', 3000) })
+ *     .option('verbose', { type: 'boolean', default: false })
+ * });
+ *
+ * @example
+ * // Explicit configuration
+ * const config = makeConfig({
+ *   lenv: { enabled: true },
+ *   env: { enabled: true },
+ *   getenv: { enabled: true },
+ *   yargs: (yargs, getenv) => yargs
+ *     .option('api-key', { type: 'string', default: getenv('API_KEY', '') })
+ *     .option('port', { type: 'number', default: getenv('PORT', 3000) })
+ * });
+ */
+export function makeConfig(config = {}) {
+  const {
+    yargs: yargsConfigFn,
+    lenv = {},
+    env = {},
+    getenv: getenvConfig = {},
+    argv = process.argv,
+  } = config;
+
+  // Default options
+  const lenvEnabled = lenv.enabled !== false; // Default: true
+  const lenvPath = lenv.path || '.lenv';
+  const lenvOverride = lenv.override !== false; // Default: true
+
+  const envEnabled = env.enabled === true; // Default: false
+  const envQuiet = env.quiet !== false; // Default: true
+
+  const getenvEnabled = getenvConfig.enabled !== false; // Default: true
+
+  // Step 1: Load dotenvx/.env (DEPRECATED, lowest priority)
+  if (envEnabled) {
+    loadDotenvx({ quiet: envQuiet });
+  }
+
+  // Step 2: Load .lenv file (overrides .env)
+  if (lenvEnabled) {
+    applyLinoEnv(lenvPath, { override: lenvOverride, quiet: false });
+  }
+
+  // Step 3: Parse initial CLI args to check for --configuration
+  const initialYargs = yargs(hideBin(argv))
+    .option('configuration', {
+      type: 'string',
+      describe: 'Path to configuration .lenv file',
+      alias: 'c',
+    })
+    .help(false) // Disable help for initial parse
+    .version(false) // Disable version for initial parse
+    .exitProcess(false); // Don't exit on parse errors
+
+  let initialParsed;
+  try {
+    initialParsed = initialYargs.parseSync();
+  } catch (_error) {
+    initialParsed = {};
+  }
+
+  // Step 4: Load --configuration file if specified (overrides default .lenv)
+  if (initialParsed.configuration) {
+    applyLinoEnv(initialParsed.configuration, { override: true, quiet: false });
+  }
+
+  // Step 5: Configure yargs with user options + getenv helper
+  const yargsInstance = yargs(hideBin(argv)).option('configuration', {
+    type: 'string',
+    describe: 'Path to configuration .lenv file',
+    alias: 'c',
+  });
+
+  // Pass getenv helper if enabled
+  const getenvHelper = getenvEnabled ? getenv : () => '';
+  const configuredYargs = yargsConfigFn
+    ? yargsConfigFn(yargsInstance, getenvHelper)
+    : yargsInstance;
+
+  // Step 6: Parse final configuration (CLI args have highest priority)
+  const parsed = configuredYargs.parseSync();
+
+  // Step 7: Convert kebab-case keys to camelCase for result object
+  const result = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    if (key !== '_' && key !== '$0') {
+      const camelKey = toCamelCase(key);
+      result[camelKey] = value;
+    }
+  }
+
+  return result;
+}
+
+// ============================================================================
+// Legacy API (for backwards compatibility)
+// ============================================================================
 
 /**
  * Parse arguments from links notation format
- * Converts links notation strings into an array of CLI arguments
- *
- * @param {string} linoString - String in links notation format
- * @returns {string[]} Array of parsed arguments
- *
- * @example
- * parseLinoArguments('(\n  --verbose\n  --port 3000\n)')
- * // Returns: ['--verbose', '--port', '3000']
+ * @deprecated Use makeConfig() instead
  */
 export function parseLinoArguments(linoString) {
   if (!linoString || typeof linoString !== 'string') {
@@ -32,8 +398,6 @@ export function parseLinoArguments(linoString) {
 
   try {
     const parsed = parser.parse(linoString);
-
-    // Extract arguments from parsed links
     const args = [];
 
     for (const link of parsed) {
@@ -56,7 +420,6 @@ export function parseLinoArguments(linoString) {
       (arg) => arg && arg.trim() && !arg.trim().startsWith('#')
     );
   } catch (_error) {
-    // If parsing fails, fall back to simple line-based parsing
     return linoString
       .split('\n')
       .map((line) => line.trim())
@@ -64,175 +427,6 @@ export function parseLinoArguments(linoString) {
         (line) => line && !line.startsWith('#') && line !== '(' && line !== ')'
       );
   }
-}
-
-/**
- * Load environment configuration from a .lenv file
- *
- * @param {string} filePath - Path to the .lenv file (default: '.lenv')
- * @returns {LinoEnv} LinoEnv instance with loaded data
- *
- * @example
- * const env = loadLinoEnv('.lenv');
- * const apiKey = env.get('API_KEY');
- */
-export function loadLinoEnv(filePath = '.lenv') {
-  const env = new LinoEnv(filePath);
-  env.read();
-  return env;
-}
-
-/**
- * Apply .lenv configuration to process.env
- * This makes environment variables from .lenv available via process.env
- *
- * @param {string} filePath - Path to the .lenv file (default: '.lenv')
- * @param {Object} options - Options for applying configuration
- * @param {boolean} options.override - Whether to override existing process.env values (default: false)
- * @returns {Object} Object containing all loaded environment variables
- *
- * @example
- * applyLinoEnv('.lenv', { override: false });
- */
-export function applyLinoEnv(filePath = '.lenv', options = {}) {
-  const { override = false } = options;
-
-  try {
-    const env = loadLinoEnv(filePath);
-    const envObject = env.toObject();
-
-    for (const [key, value] of Object.entries(envObject)) {
-      if (override || !process.env[key]) {
-        process.env[key] = value;
-      }
-    }
-
-    return envObject;
-  } catch (_error) {
-    // If .lenv file doesn't exist or can't be read, return empty object
-    return {};
-  }
-}
-
-/**
- * DEPRECATED: Load dotenvx configuration
- *
- * @deprecated Use Links Notation (.lenv files) for environment configuration instead.
- * @param {Object} options - Options to pass to dotenvx
- * @returns {Object} Result from dotenvx.config()
- *
- * @example
- * // DEPRECATED - use applyLinoEnv() instead
- * loadDotenvx();
- */
-export function loadDotenvx(options = {}) {
-  console.warn(
-    '⚠️  DEPRECATED: loadDotenvx() is deprecated. ' +
-      'Please use Links Notation (.lenv files) for environment configuration instead. ' +
-      'Use applyLinoEnv() to load .lenv files.'
-  );
-
-  try {
-    // Dynamic import to support optional dependency
-    return import('@dotenvx/dotenvx').then((module) => module.config(options));
-  } catch (error) {
-    console.error(
-      'dotenvx is not installed. Install it with: npm install @dotenvx/dotenvx'
-    );
-    throw error;
-  }
-}
-
-/**
- * Create a yargs instance pre-configured with lino-arguments helpers
- *
- * @param {string[]} argv - Command line arguments (default: process.argv)
- * @returns {Object} Configured yargs instance
- *
- * @example
- * const args = createYargsConfig()
- *   .option('verbose', {
- *     alias: 'v',
- *     type: 'boolean',
- *     description: 'Run with verbose logging'
- *   })
- *   .parse();
- */
-export function createYargsConfig(argv = process.argv) {
-  return yargs(hideBin(argv));
-}
-
-/**
- * Parse arguments from environment variable using links notation
- * Useful for reading configuration overrides from environment variables
- *
- * @param {string} envVarName - Name of the environment variable
- * @param {string} defaultValue - Default value if environment variable is not set
- * @returns {string[]} Parsed arguments array
- *
- * @example
- * // If process.env.CLI_OVERRIDES = '(\n  --debug\n  --port 8080\n)'
- * const overrides = parseEnvArguments('CLI_OVERRIDES');
- * // Returns: ['--debug', '--port', '8080']
- */
-export function parseEnvArguments(envVarName, defaultValue = '') {
-  const envValue = process.env[envVarName] || defaultValue;
-  return parseLinoArguments(envValue);
-}
-
-/**
- * Merge multiple argument sources and parse with yargs
- * Combines .lenv files, environment variable overrides, and CLI arguments
- *
- * @param {Object} config - Configuration object
- * @param {Object} config.yargsConfig - Yargs configuration function
- * @param {string} config.lenvPath - Path to .lenv file (optional)
- * @param {string} config.overridesEnvVar - Environment variable name for overrides (optional)
- * @param {string[]} config.additionalArgs - Additional arguments to parse (optional)
- * @param {boolean} config.applyEnvToProcess - Apply .lenv to process.env (default: true)
- * @returns {Promise<Object>} Parsed arguments
- *
- * @example
- * const args = await mergeAndParse({
- *   yargsConfig: (yargs) => yargs
- *     .option('port', { type: 'number', default: 3000 })
- *     .option('verbose', { type: 'boolean', default: false }),
- *   lenvPath: '.lenv',
- *   overridesEnvVar: 'CLI_OVERRIDES',
- *   applyEnvToProcess: true
- * });
- */
-export async function mergeAndParse(config) {
-  const {
-    yargsConfig,
-    lenvPath = '.lenv',
-    overridesEnvVar,
-    additionalArgs = [],
-    applyEnvToProcess = true,
-  } = config;
-
-  // Step 1: Apply .lenv configuration to process.env if requested
-  if (lenvPath && applyEnvToProcess) {
-    applyLinoEnv(lenvPath, { override: false });
-  }
-
-  // Step 2: Parse overrides from environment variable if specified
-  const overrideArgs = overridesEnvVar
-    ? parseEnvArguments(overridesEnvVar)
-    : [];
-
-  // Step 3: Merge all arguments
-  const allArgs = [...additionalArgs, ...overrideArgs];
-
-  // Step 4: Configure yargs
-  const yargsInstance = createYargsConfig(
-    allArgs.length > 0 ? ['node', 'script', ...allArgs] : process.argv
-  );
-
-  const configuredYargs = yargsConfig(yargsInstance);
-
-  // Step 5: Parse and return
-  return await configuredYargs.parse();
 }
 
 // Export all components for advanced usage

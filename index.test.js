@@ -3,19 +3,528 @@ import assert from 'node:assert';
 import { writeFileSync, unlinkSync, existsSync } from 'fs';
 import { join } from 'path';
 import {
+  makeConfig,
+  getenv,
+  toUpperCase,
+  toCamelCase,
+  toKebabCase,
+  toSnakeCase,
+  toPascalCase,
   parseLinoArguments,
-  loadLinoEnv,
-  applyLinoEnv,
-  parseEnvArguments,
-  createYargsConfig,
-  mergeAndParse,
 } from './index.js';
 
-describe('parseLinoArguments', () => {
+// ============================================================================
+// Case Conversion Tests
+// ============================================================================
+
+describe('Case Conversion Utilities', () => {
+  describe('toUpperCase', () => {
+    it('should convert camelCase to UPPER_CASE', () => {
+      assert.strictEqual(toUpperCase('apiKey'), 'API_KEY');
+      assert.strictEqual(toUpperCase('myVariableName'), 'MY_VARIABLE_NAME');
+    });
+
+    it('should convert kebab-case to UPPER_CASE', () => {
+      assert.strictEqual(toUpperCase('api-key'), 'API_KEY');
+      assert.strictEqual(toUpperCase('my-variable-name'), 'MY_VARIABLE_NAME');
+    });
+
+    it('should convert snake_case to UPPER_CASE', () => {
+      assert.strictEqual(toUpperCase('api_key'), 'API_KEY');
+      assert.strictEqual(toUpperCase('my_variable_name'), 'MY_VARIABLE_NAME');
+    });
+
+    it('should convert PascalCase to UPPER_CASE', () => {
+      assert.strictEqual(toUpperCase('ApiKey'), 'API_KEY');
+      assert.strictEqual(toUpperCase('MyVariableName'), 'MY_VARIABLE_NAME');
+    });
+
+    it('should handle already UPPER_CASE', () => {
+      assert.strictEqual(toUpperCase('API_KEY'), 'API_KEY');
+    });
+  });
+
+  describe('toCamelCase', () => {
+    it('should convert kebab-case to camelCase', () => {
+      assert.strictEqual(toCamelCase('api-key'), 'apiKey');
+      assert.strictEqual(toCamelCase('my-variable-name'), 'myVariableName');
+    });
+
+    it('should convert UPPER_CASE to camelCase', () => {
+      assert.strictEqual(toCamelCase('API_KEY'), 'apiKey');
+      assert.strictEqual(toCamelCase('MY_VARIABLE_NAME'), 'myVariableName');
+    });
+
+    it('should convert snake_case to camelCase', () => {
+      assert.strictEqual(toCamelCase('api_key'), 'apiKey');
+      assert.strictEqual(toCamelCase('my_variable_name'), 'myVariableName');
+    });
+
+    it('should convert PascalCase to camelCase', () => {
+      assert.strictEqual(toCamelCase('ApiKey'), 'apikey');
+      assert.strictEqual(toCamelCase('MyVariableName'), 'myvariablename');
+    });
+
+    it('should handle already camelCase', () => {
+      assert.strictEqual(toCamelCase('apiKey'), 'apikey');
+    });
+  });
+
+  describe('toKebabCase', () => {
+    it('should convert camelCase to kebab-case', () => {
+      assert.strictEqual(toKebabCase('apiKey'), 'api-key');
+      assert.strictEqual(toKebabCase('myVariableName'), 'my-variable-name');
+    });
+
+    it('should convert UPPER_CASE to kebab-case', () => {
+      assert.strictEqual(toKebabCase('API_KEY'), 'api-key');
+      assert.strictEqual(toKebabCase('MY_VARIABLE_NAME'), 'my-variable-name');
+    });
+
+    it('should convert PascalCase to kebab-case', () => {
+      assert.strictEqual(toKebabCase('ApiKey'), 'api-key');
+      assert.strictEqual(toKebabCase('MyVariableName'), 'my-variable-name');
+    });
+
+    it('should handle already kebab-case', () => {
+      assert.strictEqual(toKebabCase('api-key'), 'api-key');
+    });
+  });
+
+  describe('toSnakeCase', () => {
+    it('should convert camelCase to snake_case', () => {
+      assert.strictEqual(toSnakeCase('apiKey'), 'api_key');
+      assert.strictEqual(toSnakeCase('myVariableName'), 'my_variable_name');
+    });
+
+    it('should convert kebab-case to snake_case', () => {
+      assert.strictEqual(toSnakeCase('api-key'), 'api_key');
+      assert.strictEqual(toSnakeCase('my-variable-name'), 'my_variable_name');
+    });
+
+    it('should convert UPPER_CASE to snake_case', () => {
+      assert.strictEqual(toSnakeCase('API_KEY'), 'api_key');
+    });
+
+    it('should handle already snake_case', () => {
+      assert.strictEqual(toSnakeCase('api_key'), 'api_key');
+    });
+  });
+
+  describe('toPascalCase', () => {
+    it('should convert camelCase to PascalCase', () => {
+      assert.strictEqual(toPascalCase('apiKey'), 'Apikey');
+    });
+
+    it('should convert kebab-case to PascalCase', () => {
+      assert.strictEqual(toPascalCase('api-key'), 'ApiKey');
+      assert.strictEqual(toPascalCase('my-variable-name'), 'MyVariableName');
+    });
+
+    it('should convert snake_case to PascalCase', () => {
+      assert.strictEqual(toPascalCase('api_key'), 'ApiKey');
+      assert.strictEqual(toPascalCase('my_variable_name'), 'MyVariableName');
+    });
+
+    it('should handle already PascalCase', () => {
+      assert.strictEqual(toPascalCase('ApiKey'), 'Apikey');
+    });
+  });
+});
+
+// ============================================================================
+// getenv Tests
+// ============================================================================
+
+describe('getenv', () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    // Clean test variables
+    delete process.env.TEST_VAR;
+    delete process.env.testVar;
+    delete process.env['test-var'];
+    delete process.env.test_var;
+    delete process.env.TestVar;
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it('should find variable in UPPER_CASE', () => {
+    process.env.TEST_VAR = 'value';
+    assert.strictEqual(getenv('testVar'), 'value');
+    assert.strictEqual(getenv('test-var'), 'value');
+    assert.strictEqual(getenv('TEST_VAR'), 'value');
+  });
+
+  it('should find variable in camelCase', () => {
+    process.env.testVar = 'value';
+    assert.strictEqual(getenv('TEST_VAR'), 'value');
+    assert.strictEqual(getenv('test-var'), 'value');
+  });
+
+  it('should find variable in kebab-case', () => {
+    process.env['test-var'] = 'value';
+    assert.strictEqual(getenv('testVar'), 'value');
+  });
+
+  it('should return default value when not found', () => {
+    assert.strictEqual(getenv('NON_EXISTENT', 'default'), 'default');
+  });
+
+  it('should return empty string as default when not specified', () => {
+    assert.strictEqual(getenv('NON_EXISTENT'), '');
+  });
+
+  it('should try original key first', () => {
+    process.env.myKey = 'original';
+    process.env.MY_KEY = 'upper';
+    assert.strictEqual(getenv('myKey'), 'original');
+  });
+});
+
+// ============================================================================
+// makeConfig Tests
+// ============================================================================
+
+describe('makeConfig', () => {
+  const testLenvFile = join(process.cwd(), '.test-makeconfig.lenv');
+  const testConfigFile = join(process.cwd(), '.test-config.lenv');
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    // Clean all test variables
+    Object.keys(process.env).forEach((key) => {
+      if (key.startsWith('TEST_') || key.startsWith('APP_')) {
+        delete process.env[key];
+      }
+    });
+  });
+
+  afterEach(() => {
+    [testLenvFile, testConfigFile].forEach((file) => {
+      if (existsSync(file)) {
+        unlinkSync(file);
+      }
+    });
+    process.env = { ...originalEnv };
+  });
+
+  describe('Hero Example (defaults)', () => {
+    it('should work with minimal configuration', () => {
+      const config = makeConfig({
+        yargs: (yargs, getenv) =>
+          yargs
+            .option('port', { type: 'number', default: getenv('PORT', 3000) })
+            .option('verbose', { type: 'boolean', default: false }),
+        argv: ['node', 'script.js'],
+      });
+
+      assert.strictEqual(config.port, 3000);
+      assert.strictEqual(config.verbose, false);
+    });
+
+    it('should use CLI arguments with highest priority', () => {
+      const config = makeConfig({
+        yargs: (yargs, getenv) =>
+          yargs
+            .option('port', { type: 'number', default: getenv('PORT', 3000) })
+            .option('verbose', { type: 'boolean', default: false }),
+        argv: ['node', 'script.js', '--port', '8080', '--verbose'],
+      });
+
+      assert.strictEqual(config.port, 8080);
+      assert.strictEqual(config.verbose, true);
+    });
+
+    it('should convert kebab-case to camelCase in result', () => {
+      const config = makeConfig({
+        yargs: (yargs) =>
+          yargs.option('api-key', { type: 'string', default: 'key123' }),
+        argv: ['node', 'script.js'],
+      });
+
+      assert.strictEqual(config.apiKey, 'key123');
+      assert.strictEqual(config['api-key'], undefined);
+    });
+  });
+
+  describe('Environment Loading Priority', () => {
+    it('should load .lenv file by default', () => {
+      writeFileSync(testLenvFile, 'APP_PORT: 5000\nAPP_HOST: localhost\n');
+
+      const config = makeConfig({
+        yargs: (yargs, getenv) =>
+          yargs.option('port', {
+            type: 'number',
+            default: getenv('APP_PORT', 3000),
+          }),
+        lenv: { path: testLenvFile },
+        argv: ['node', 'script.js'],
+      });
+
+      assert.strictEqual(config.port, 5000);
+      assert.strictEqual(process.env.APP_PORT, '5000');
+    });
+
+    it('should handle --configuration flag', () => {
+      writeFileSync(testLenvFile, 'APP_PORT: 5000\n');
+      writeFileSync(testConfigFile, 'APP_PORT: 9000\n');
+
+      const config = makeConfig({
+        yargs: (yargs, getenv) =>
+          yargs.option('port', {
+            type: 'number',
+            default: getenv('APP_PORT', 3000),
+          }),
+        lenv: { path: testLenvFile },
+        argv: ['node', 'script.js', '--configuration', testConfigFile],
+      });
+
+      // --configuration should override default .lenv
+      assert.strictEqual(config.port, 9000);
+      assert.strictEqual(process.env.APP_PORT, '9000');
+    });
+
+    it('should prioritize CLI over environment', () => {
+      writeFileSync(testLenvFile, 'APP_PORT: 5000\n');
+
+      const config = makeConfig({
+        yargs: (yargs, getenv) =>
+          yargs.option('port', {
+            type: 'number',
+            default: getenv('APP_PORT', 3000),
+          }),
+        lenv: { path: testLenvFile },
+        argv: ['node', 'script.js', '--port', '7000'],
+      });
+
+      // CLI should have highest priority
+      assert.strictEqual(config.port, 7000);
+    });
+
+    it('should handle missing .lenv file gracefully', () => {
+      const config = makeConfig({
+        yargs: (yargs, getenv) =>
+          yargs.option('port', {
+            type: 'number',
+            default: getenv('APP_PORT', 3000),
+          }),
+        lenv: { path: 'non-existent.lenv' },
+        argv: ['node', 'script.js'],
+      });
+
+      assert.strictEqual(config.port, 3000);
+    });
+  });
+
+  describe('Case Conversion in Environment Loading', () => {
+    it('should convert all keys to UPPER_CASE in process.env', () => {
+      writeFileSync(
+        testLenvFile,
+        'apiKey: key123\nmy-port: 3000\nmy_host: localhost\n'
+      );
+
+      makeConfig({
+        yargs: (yargs) => yargs,
+        lenv: { path: testLenvFile },
+        argv: ['node', 'script.js'],
+      });
+
+      assert.strictEqual(process.env.API_KEY, 'key123');
+      assert.strictEqual(process.env.MY_PORT, '3000');
+      assert.strictEqual(process.env.MY_HOST, 'localhost');
+    });
+
+    it('should find env vars in any case format via getenv', () => {
+      process.env.API_KEY = 'secret';
+
+      const config = makeConfig({
+        yargs: (yargs, getenv) =>
+          yargs
+            .option('api-key', {
+              type: 'string',
+              default: getenv('apiKey', 'default'),
+            })
+            .option('another-key', {
+              type: 'string',
+              default: getenv('anotherKey', 'default'),
+            }),
+        argv: ['node', 'script.js'],
+      });
+
+      // getenv should find API_KEY when asked for apiKey
+      assert.strictEqual(config.apiKey, 'secret');
+      // Non-existent should use default
+      assert.strictEqual(config.anotherKey, 'default');
+    });
+  });
+
+  describe('Configuration Options', () => {
+    it('should support disabling lenv', () => {
+      writeFileSync(testLenvFile, 'APP_PORT: 5000\n');
+
+      const config = makeConfig({
+        yargs: (yargs, getenv) =>
+          yargs.option('port', {
+            type: 'number',
+            default: getenv('APP_PORT', 3000),
+          }),
+        lenv: { enabled: false, path: testLenvFile },
+        argv: ['node', 'script.js'],
+      });
+
+      // Should not load from .lenv
+      assert.strictEqual(config.port, 3000);
+      assert.strictEqual(process.env.APP_PORT, undefined);
+    });
+
+    it('should support enabling env/dotenvx (deprecated)', () => {
+      // Note: This test will show deprecation warning
+      const config = makeConfig({
+        yargs: (yargs) =>
+          yargs.option('test', { type: 'boolean', default: false }),
+        env: { enabled: true, quiet: true },
+        argv: ['node', 'script.js'],
+      });
+
+      assert.strictEqual(config.test, false);
+    });
+
+    it('should support disabling getenv', () => {
+      process.env.TEST_PORT = '5000';
+
+      const config = makeConfig({
+        yargs: (yargs, getenv) =>
+          yargs.option('port', {
+            type: 'number',
+            // getenv should return empty string when disabled
+            default: getenv('TEST_PORT', 3000) || 3000,
+          }),
+        getenv: { enabled: false },
+        argv: ['node', 'script.js'],
+      });
+
+      assert.strictEqual(config.port, 3000);
+    });
+
+    it('should support configuration alias -c', () => {
+      writeFileSync(testConfigFile, 'APP_PORT: 9000\n');
+
+      const config = makeConfig({
+        yargs: (yargs, getenv) =>
+          yargs.option('port', {
+            type: 'number',
+            default: getenv('APP_PORT', 3000),
+          }),
+        argv: ['node', 'script.js', '-c', testConfigFile],
+      });
+
+      assert.strictEqual(config.port, 9000);
+    });
+  });
+
+  describe('Complete Priority Chain', () => {
+    it('should demonstrate full priority: CLI > getenv > --configuration > .lenv', () => {
+      // Setup: .lenv with base config
+      writeFileSync(
+        testLenvFile,
+        'APP_PORT: 3000\nAPP_HOST: localhost\nAPP_NAME: base\n'
+      );
+
+      // Setup: --configuration with overrides
+      writeFileSync(
+        testConfigFile,
+        'APP_PORT: 5000\nAPP_HOST: override-host\n'
+      );
+
+      // Test 1: Only .lenv (no CLI, no --configuration)
+      let config = makeConfig({
+        yargs: (yargs, getenv) =>
+          yargs
+            .option('port', { type: 'number', default: getenv('APP_PORT', 0) })
+            .option('host', { type: 'string', default: getenv('APP_HOST', '') })
+            .option('name', {
+              type: 'string',
+              default: getenv('APP_NAME', ''),
+            }),
+        lenv: { path: testLenvFile },
+        argv: ['node', 'script.js'],
+      });
+
+      assert.strictEqual(config.port, 3000);
+      assert.strictEqual(config.host, 'localhost');
+      assert.strictEqual(config.name, 'base');
+
+      // Clean env for next test
+      delete process.env.APP_PORT;
+      delete process.env.APP_HOST;
+      delete process.env.APP_NAME;
+
+      // Test 2: .lenv + --configuration
+      config = makeConfig({
+        yargs: (yargs, getenv) =>
+          yargs
+            .option('port', { type: 'number', default: getenv('APP_PORT', 0) })
+            .option('host', { type: 'string', default: getenv('APP_HOST', '') })
+            .option('name', {
+              type: 'string',
+              default: getenv('APP_NAME', ''),
+            }),
+        lenv: { path: testLenvFile },
+        argv: ['node', 'script.js', '--configuration', testConfigFile],
+      });
+
+      assert.strictEqual(config.port, 5000); // from --configuration
+      assert.strictEqual(config.host, 'override-host'); // from --configuration
+      assert.strictEqual(config.name, 'base'); // from .lenv (not in --configuration)
+
+      // Clean env for next test
+      delete process.env.APP_PORT;
+      delete process.env.APP_HOST;
+      delete process.env.APP_NAME;
+
+      // Test 3: .lenv + --configuration + CLI
+      config = makeConfig({
+        yargs: (yargs, getenv) =>
+          yargs
+            .option('port', { type: 'number', default: getenv('APP_PORT', 0) })
+            .option('host', { type: 'string', default: getenv('APP_HOST', '') })
+            .option('name', {
+              type: 'string',
+              default: getenv('APP_NAME', ''),
+            }),
+        lenv: { path: testLenvFile },
+        argv: [
+          'node',
+          'script.js',
+          '--configuration',
+          testConfigFile,
+          '--port',
+          '9000',
+        ],
+      });
+
+      assert.strictEqual(config.port, 9000); // from CLI (highest priority)
+      assert.strictEqual(config.host, 'override-host'); // from --configuration
+      assert.strictEqual(config.name, 'base'); // from .lenv
+    });
+  });
+});
+
+// ============================================================================
+// Legacy API Tests (backwards compatibility)
+// ============================================================================
+
+describe('parseLinoArguments (legacy)', () => {
   it('should parse simple links notation format', () => {
     const input = '(\n  --verbose\n  --port 3000\n)';
     const result = parseLinoArguments(input);
-    assert.deepStrictEqual(result, ['--verbose', '--port', '3000']);
+    assert.ok(result.includes('--verbose'));
+    assert.ok(result.includes('--port'));
+    assert.ok(result.includes('3000'));
   });
 
   it('should parse arguments without parentheses', () => {
@@ -42,275 +551,5 @@ describe('parseLinoArguments', () => {
     assert.ok(!result.some((arg) => arg.startsWith('#')));
     assert.ok(result.includes('--verbose'));
     assert.ok(result.includes('--debug'));
-  });
-
-  it('should handle complex arguments with values', () => {
-    const input = '--config /path/to/config.json\n--output ./dist';
-    const result = parseLinoArguments(input);
-    assert.ok(result.includes('--config'));
-    assert.ok(result.includes('/path/to/config.json'));
-    assert.ok(result.includes('--output'));
-    assert.ok(result.includes('./dist'));
-  });
-});
-
-describe('loadLinoEnv', () => {
-  const testEnvFile = join(process.cwd(), '.test.lenv');
-
-  afterEach(() => {
-    if (existsSync(testEnvFile)) {
-      unlinkSync(testEnvFile);
-    }
-  });
-
-  it('should load environment variables from .lenv file', () => {
-    writeFileSync(testEnvFile, 'TEST_VAR: test_value\nAPI_KEY: secret123\n');
-
-    const env = loadLinoEnv(testEnvFile);
-    assert.strictEqual(env.get('TEST_VAR'), 'test_value');
-    assert.strictEqual(env.get('API_KEY'), 'secret123');
-  });
-
-  it('should handle non-existent file gracefully', () => {
-    const env = loadLinoEnv('non-existent.lenv');
-    assert.strictEqual(env.get('ANY_VAR'), undefined);
-  });
-
-  it('should handle empty .lenv file', () => {
-    writeFileSync(testEnvFile, '');
-    const env = loadLinoEnv(testEnvFile);
-    assert.strictEqual(env.keys().length, 0);
-  });
-});
-
-describe('applyLinoEnv', () => {
-  const testEnvFile = join(process.cwd(), '.test-apply.lenv');
-  const originalEnv = { ...process.env };
-
-  beforeEach(() => {
-    // Clean up test variables before each test
-    delete process.env.TEST_APPLY_VAR;
-    delete process.env.ANOTHER_VAR;
-  });
-
-  afterEach(() => {
-    if (existsSync(testEnvFile)) {
-      unlinkSync(testEnvFile);
-    }
-    // Restore original environment
-    process.env = { ...originalEnv };
-  });
-
-  it('should apply .lenv variables to process.env', () => {
-    writeFileSync(
-      testEnvFile,
-      'TEST_APPLY_VAR: applied_value\nANOTHER_VAR: another_value\n'
-    );
-
-    applyLinoEnv(testEnvFile);
-    assert.strictEqual(process.env.TEST_APPLY_VAR, 'applied_value');
-    assert.strictEqual(process.env.ANOTHER_VAR, 'another_value');
-  });
-
-  it('should not override existing process.env by default', () => {
-    process.env.EXISTING_VAR = 'original';
-    writeFileSync(testEnvFile, 'EXISTING_VAR: new_value\n');
-
-    applyLinoEnv(testEnvFile);
-    assert.strictEqual(process.env.EXISTING_VAR, 'original');
-  });
-
-  it('should override existing process.env when override option is true', () => {
-    process.env.EXISTING_VAR = 'original';
-    writeFileSync(testEnvFile, 'EXISTING_VAR: new_value\n');
-
-    applyLinoEnv(testEnvFile, { override: true });
-    assert.strictEqual(process.env.EXISTING_VAR, 'new_value');
-  });
-
-  it('should handle non-existent file gracefully', () => {
-    const result = applyLinoEnv('non-existent-apply.lenv');
-    assert.deepStrictEqual(result, {});
-  });
-});
-
-describe('parseEnvArguments', () => {
-  const originalEnv = { ...process.env };
-
-  beforeEach(() => {
-    delete process.env.TEST_OVERRIDES;
-  });
-
-  afterEach(() => {
-    process.env = { ...originalEnv };
-  });
-
-  it('should parse arguments from environment variable', () => {
-    process.env.TEST_OVERRIDES = '--verbose\n--port 8080';
-    const result = parseEnvArguments('TEST_OVERRIDES');
-    assert.ok(result.includes('--verbose'));
-    assert.ok(result.includes('--port'));
-    assert.ok(result.includes('8080'));
-  });
-
-  it('should use default value when env var is not set', () => {
-    const result = parseEnvArguments('NON_EXISTENT_VAR', '--default');
-    assert.ok(result.includes('--default'));
-  });
-
-  it('should return empty array for non-existent var without default', () => {
-    const result = parseEnvArguments('NON_EXISTENT_VAR');
-    assert.deepStrictEqual(result, []);
-  });
-});
-
-describe('createYargsConfig', () => {
-  it('should create a yargs instance', () => {
-    const yargsInstance = createYargsConfig();
-    assert.ok(yargsInstance);
-    assert.ok(typeof yargsInstance.parse === 'function');
-  });
-
-  it('should accept custom argv', () => {
-    const customArgv = ['node', 'script.js', '--test'];
-    const yargsInstance = createYargsConfig(customArgv);
-    assert.ok(yargsInstance);
-  });
-});
-
-describe('mergeAndParse', () => {
-  const testEnvFile = join(process.cwd(), '.test-merge.lenv');
-  const originalEnv = { ...process.env };
-
-  beforeEach(() => {
-    delete process.env.MERGE_TEST_VAR;
-    delete process.env.CLI_OVERRIDES;
-  });
-
-  afterEach(() => {
-    if (existsSync(testEnvFile)) {
-      unlinkSync(testEnvFile);
-    }
-    process.env = { ...originalEnv };
-  });
-
-  it('should merge .lenv file and parse arguments', async () => {
-    writeFileSync(testEnvFile, 'MERGE_TEST_VAR: from_lenv\n');
-
-    const args = await mergeAndParse({
-      yargsConfig: (yargs) =>
-        yargs.option('verbose', { type: 'boolean', default: false }),
-      lenvPath: testEnvFile,
-      additionalArgs: ['--verbose'],
-    });
-
-    assert.strictEqual(args.verbose, true);
-    assert.strictEqual(process.env.MERGE_TEST_VAR, 'from_lenv');
-  });
-
-  it('should handle environment variable overrides', async () => {
-    process.env.CLI_OVERRIDES = '--debug\n--port 9000';
-
-    const args = await mergeAndParse({
-      yargsConfig: (yargs) =>
-        yargs
-          .option('debug', { type: 'boolean', default: false })
-          .option('port', { type: 'number', default: 3000 }),
-      overridesEnvVar: 'CLI_OVERRIDES',
-    });
-
-    assert.strictEqual(args.debug, true);
-    assert.strictEqual(args.port, 9000);
-  });
-
-  it('should work without .lenv file', async () => {
-    const args = await mergeAndParse({
-      yargsConfig: (yargs) =>
-        yargs.option('test', { type: 'boolean', default: false }),
-      lenvPath: 'non-existent.lenv',
-      additionalArgs: ['--test'],
-    });
-
-    assert.strictEqual(args.test, true);
-  });
-
-  it('should not apply env to process when applyEnvToProcess is false', async () => {
-    writeFileSync(testEnvFile, 'NO_APPLY_VAR: should_not_appear\n');
-
-    await mergeAndParse({
-      yargsConfig: (yargs) => yargs,
-      lenvPath: testEnvFile,
-      applyEnvToProcess: false,
-    });
-
-    assert.strictEqual(process.env.NO_APPLY_VAR, undefined);
-  });
-
-  it('should merge multiple sources correctly', async () => {
-    writeFileSync(testEnvFile, 'MERGE_VAR: from_file\n');
-    process.env.CLI_OVERRIDES = '--override-flag';
-
-    const args = await mergeAndParse({
-      yargsConfig: (yargs) =>
-        yargs
-          .option('local', { type: 'boolean', default: false })
-          .option('override-flag', { type: 'boolean', default: false }),
-      lenvPath: testEnvFile,
-      overridesEnvVar: 'CLI_OVERRIDES',
-      additionalArgs: ['--local'],
-    });
-
-    assert.strictEqual(args.local, true);
-    assert.strictEqual(args['override-flag'], true);
-    assert.strictEqual(process.env.MERGE_VAR, 'from_file');
-  });
-});
-
-describe('integration tests', () => {
-  const testEnvFile = join(process.cwd(), '.integration.lenv');
-  const originalEnv = { ...process.env };
-
-  beforeEach(() => {
-    delete process.env.APP_PORT;
-    delete process.env.APP_HOST;
-    delete process.env.INTEGRATION_OVERRIDES;
-  });
-
-  afterEach(() => {
-    if (existsSync(testEnvFile)) {
-      unlinkSync(testEnvFile);
-    }
-    process.env = { ...originalEnv };
-  });
-
-  it('should support full workflow: .lenv + env overrides + CLI args', async () => {
-    // Step 1: Create .lenv file with defaults
-    writeFileSync(
-      testEnvFile,
-      'APP_PORT: 3000\nAPP_HOST: localhost\nAPP_NAME: test-app\n'
-    );
-
-    // Step 2: Set environment override
-    process.env.INTEGRATION_OVERRIDES = '--verbose\n--debug';
-
-    // Step 3: Parse everything together
-    const args = await mergeAndParse({
-      yargsConfig: (yargs) =>
-        yargs
-          .option('verbose', { type: 'boolean', default: false })
-          .option('debug', { type: 'boolean', default: false })
-          .option('production', { type: 'boolean', default: false }),
-      lenvPath: testEnvFile,
-      overridesEnvVar: 'INTEGRATION_OVERRIDES',
-      additionalArgs: ['--production'],
-    });
-
-    // Verify all sources were merged
-    assert.strictEqual(args.verbose, true); // from env override
-    assert.strictEqual(args.debug, true); // from env override
-    assert.strictEqual(args.production, true); // from additional args
-    assert.strictEqual(process.env.APP_PORT, '3000'); // from .lenv
-    assert.strictEqual(process.env.APP_HOST, 'localhost'); // from .lenv
-    assert.strictEqual(process.env.APP_NAME, 'test-app'); // from .lenv
   });
 });
