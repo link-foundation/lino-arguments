@@ -215,7 +215,7 @@ describe('makeConfig', () => {
   describe('Hero Example (defaults)', () => {
     it('should work with minimal configuration', () => {
       const config = makeConfig({
-        yargs: (yargs, getenv) =>
+        yargs: ({ yargs, getenv }) =>
           yargs
             .option('port', { type: 'number', default: getenv('PORT', 3000) })
             .option('verbose', { type: 'boolean', default: false }),
@@ -228,7 +228,7 @@ describe('makeConfig', () => {
 
     it('should use CLI arguments with highest priority', () => {
       const config = makeConfig({
-        yargs: (yargs, getenv) =>
+        yargs: ({ yargs, getenv }) =>
           yargs
             .option('port', { type: 'number', default: getenv('PORT', 3000) })
             .option('verbose', { type: 'boolean', default: false }),
@@ -241,7 +241,7 @@ describe('makeConfig', () => {
 
     it('should convert kebab-case to camelCase in result', () => {
       const config = makeConfig({
-        yargs: (yargs) =>
+        yargs: ({ yargs }) =>
           yargs.option('api-key', { type: 'string', default: 'key123' }),
         argv: ['node', 'script.js'],
       });
@@ -256,7 +256,7 @@ describe('makeConfig', () => {
       writeFileSync(testLenvFile, 'APP_PORT: 5000\nAPP_HOST: localhost\n');
 
       const config = makeConfig({
-        yargs: (yargs, getenv) =>
+        yargs: ({ yargs, getenv }) =>
           yargs.option('port', {
             type: 'number',
             default: getenv('APP_PORT', 3000),
@@ -274,7 +274,7 @@ describe('makeConfig', () => {
       writeFileSync(testConfigFile, 'APP_PORT: 9000\n');
 
       const config = makeConfig({
-        yargs: (yargs, getenv) =>
+        yargs: ({ yargs, getenv }) =>
           yargs.option('port', {
             type: 'number',
             default: getenv('APP_PORT', 3000),
@@ -292,7 +292,7 @@ describe('makeConfig', () => {
       writeFileSync(testLenvFile, 'APP_PORT: 5000\n');
 
       const config = makeConfig({
-        yargs: (yargs, getenv) =>
+        yargs: ({ yargs, getenv }) =>
           yargs.option('port', {
             type: 'number',
             default: getenv('APP_PORT', 3000),
@@ -307,7 +307,7 @@ describe('makeConfig', () => {
 
     it('should handle missing .lenv file gracefully', () => {
       const config = makeConfig({
-        yargs: (yargs, getenv) =>
+        yargs: ({ yargs, getenv }) =>
           yargs.option('port', {
             type: 'number',
             default: getenv('APP_PORT', 3000),
@@ -328,7 +328,7 @@ describe('makeConfig', () => {
       );
 
       makeConfig({
-        yargs: (yargs) => yargs,
+        yargs: ({ yargs }) => yargs,
         lenv: { path: testLenvFile },
         argv: ['node', 'script.js'],
       });
@@ -342,7 +342,7 @@ describe('makeConfig', () => {
       process.env.API_KEY = 'secret';
 
       const config = makeConfig({
-        yargs: (yargs, getenv) =>
+        yargs: ({ yargs, getenv }) =>
           yargs
             .option('api-key', {
               type: 'string',
@@ -367,7 +367,7 @@ describe('makeConfig', () => {
       writeFileSync(testLenvFile, 'APP_PORT: 5000\n');
 
       const config = makeConfig({
-        yargs: (yargs, getenv) =>
+        yargs: ({ yargs, getenv }) =>
           yargs.option('port', {
             type: 'number',
             default: getenv('APP_PORT', 3000),
@@ -384,7 +384,7 @@ describe('makeConfig', () => {
     it('should support enabling env/dotenvx (deprecated)', () => {
       // Note: This test will show deprecation warning
       const config = makeConfig({
-        yargs: (yargs) =>
+        yargs: ({ yargs }) =>
           yargs.option('test', { type: 'boolean', default: false }),
         env: { enabled: true, quiet: true },
         argv: ['node', 'script.js'],
@@ -397,7 +397,7 @@ describe('makeConfig', () => {
       process.env.TEST_PORT = '5000';
 
       const config = makeConfig({
-        yargs: (yargs, getenv) =>
+        yargs: ({ yargs, getenv }) =>
           yargs.option('port', {
             type: 'number',
             // getenv should return empty string when disabled
@@ -414,7 +414,7 @@ describe('makeConfig', () => {
       writeFileSync(testConfigFile, 'APP_PORT: 9000\n');
 
       const config = makeConfig({
-        yargs: (yargs, getenv) =>
+        yargs: ({ yargs, getenv }) =>
           yargs.option('port', {
             type: 'number',
             default: getenv('APP_PORT', 3000),
@@ -442,7 +442,7 @@ describe('makeConfig', () => {
 
       // Test 1: Only .lenv (no CLI, no --configuration)
       let config = makeConfig({
-        yargs: (yargs, getenv) =>
+        yargs: ({ yargs, getenv }) =>
           yargs
             .option('port', { type: 'number', default: getenv('APP_PORT', 0) })
             .option('host', { type: 'string', default: getenv('APP_HOST', '') })
@@ -465,7 +465,7 @@ describe('makeConfig', () => {
 
       // Test 2: .lenv + --configuration
       config = makeConfig({
-        yargs: (yargs, getenv) =>
+        yargs: ({ yargs, getenv }) =>
           yargs
             .option('port', { type: 'number', default: getenv('APP_PORT', 0) })
             .option('host', { type: 'string', default: getenv('APP_HOST', '') })
@@ -488,7 +488,7 @@ describe('makeConfig', () => {
 
       // Test 3: .lenv + --configuration + CLI
       config = makeConfig({
-        yargs: (yargs, getenv) =>
+        yargs: ({ yargs, getenv }) =>
           yargs
             .option('port', { type: 'number', default: getenv('APP_PORT', 0) })
             .option('host', { type: 'string', default: getenv('APP_HOST', '') })

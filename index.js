@@ -270,7 +270,7 @@ async function loadDotenvx(options = {}) {
  * 5. dotenvx/.env file (DEPRECATED)
  *
  * @param {Object} config - Configuration object
- * @param {Function} config.yargs - Yargs configuration function: (yargs, getenv) => yargs
+ * @param {Function} config.yargs - Yargs configuration function: ({ yargs, getenv }) => yargs
  * @param {Object} [config.lenv] - Lino-env configuration
  * @param {boolean} [config.lenv.enabled=true] - Enable .lenv loading
  * @param {string} [config.lenv.path='.lenv'] - Path to .lenv file
@@ -285,7 +285,7 @@ async function loadDotenvx(options = {}) {
  * @example
  * // Hero example (defaults)
  * const config = makeConfig({
- *   yargs: (yargs, getenv) => yargs
+ *   yargs: ({ yargs, getenv }) => yargs
  *     .option('port', { type: 'number', default: getenv('PORT', 3000) })
  *     .option('verbose', { type: 'boolean', default: false })
  * });
@@ -296,7 +296,7 @@ async function loadDotenvx(options = {}) {
  *   lenv: { enabled: true },
  *   env: { enabled: true },
  *   getenv: { enabled: true },
- *   yargs: (yargs, getenv) => yargs
+ *   yargs: ({ yargs, getenv }) => yargs
  *     .option('api-key', { type: 'string', default: getenv('API_KEY', '') })
  *     .option('port', { type: 'number', default: getenv('PORT', 3000) })
  * });
@@ -363,7 +363,7 @@ export function makeConfig(config = {}) {
   // Pass getenv helper if enabled
   const getenvHelper = getenvEnabled ? getenv : () => '';
   const configuredYargs = yargsConfigFn
-    ? yargsConfigFn(yargsInstance, getenvHelper)
+    ? yargsConfigFn({ yargs: yargsInstance, getenv: getenvHelper })
     : yargsInstance;
 
   // Step 6: Parse final configuration (CLI args have highest priority)
