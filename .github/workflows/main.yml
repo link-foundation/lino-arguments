@@ -130,71 +130,64 @@ jobs:
       - name: Run tests
         run: npm test
 
-  # Test on Bun - TEMPORARILY DISABLED
-  # Bun/Deno tests are disabled until lino-env is published to npm
-  # GitHub package URLs (github:link-foundation/lino-env) are not supported
-  # by Bun and Deno's native module resolution
-  # test-bun:
-  #   name: Test on Bun
-  #   runs-on: ubuntu-latest
-  #   needs: [changeset-check]
-  #   if: always() && (github.event_name == 'push' || needs.changeset-check.result == 'success')
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #
-  #     - name: Setup Node.js (for npm install)
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: '20.x'
-  #
-  #     - name: Setup Bun
-  #       uses: oven-sh/setup-bun@v2
-  #       with:
-  #         bun-version: latest
-  #
-  #     - name: Install dependencies with npm (supports GitHub packages)
-  #       run: npm install
-  #
-  #     - name: Run tests
-  #       run: bun test
+  # Test on Bun - runs after changeset check on PRs, immediately on main
+  test-bun:
+    name: Test on Bun
+    runs-on: ubuntu-latest
+    needs: [changeset-check]
+    if: always() && (github.event_name == 'push' || needs.changeset-check.result == 'success')
+    steps:
+      - uses: actions/checkout@v4
 
-  # Test on Deno - TEMPORARILY DISABLED
-  # Bun/Deno tests are disabled until lino-env is published to npm
-  # GitHub package URLs (github:link-foundation/lino-env) are not supported
-  # by Bun and Deno's native module resolution
-  # test-deno:
-  #   name: Test on Deno
-  #   runs-on: ubuntu-latest
-  #   needs: [changeset-check]
-  #   if: always() && (github.event_name == 'push' || needs.changeset-check.result == 'success')
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #
-  #     - name: Setup Node.js (for npm install)
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: '20.x'
-  #
-  #     - name: Setup Deno
-  #       uses: denoland/setup-deno@v2
-  #       with:
-  #         deno-version: v2.x
-  #
-  #     - name: Install dependencies with npm (supports GitHub packages)
-  #       run: npm install
-  #
-  #     - name: Run tests
-  #       run: deno test --allow-read
+      - name: Setup Node.js (for npm install)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies with npm (supports GitHub packages)
+        run: npm install
+
+      - name: Run tests
+        run: bun test
+
+  # Test on Deno - runs after changeset check on PRs, immediately on main
+  test-deno:
+    name: Test on Deno
+    runs-on: ubuntu-latest
+    needs: [changeset-check]
+    if: always() && (github.event_name == 'push' || needs.changeset-check.result == 'success')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js (for npm install)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Install dependencies with npm (supports GitHub packages)
+        run: npm install
+
+      - name: Run tests
+        run: deno test --allow-read
 
   # Release - only runs on main after tests pass
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [lint, test-node]
-    # Note: test-bun and test-deno are temporarily disabled until lino-env is published to npm
+    needs: [lint, test-node, test-bun, test-deno]
     # Use always() to ensure this job runs even if changeset-check was skipped
     # This is needed because lint/test jobs have a transitive dependency on changeset-check
-    if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.lint.result == 'success' && needs.test-node.result == 'success'
+    if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.lint.result == 'success' && needs.test-node.result == 'success' && needs.test-bun.result == 'success' && needs.test-deno.result == 'success'
     permissions:
       contents: write
       pull-requests: write
