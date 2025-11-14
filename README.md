@@ -1,24 +1,19 @@
 # lino-arguments
 
-A setup of Links Notation Environment (lenv) + yargs to support easy configuration of CLI apps
+A unified configuration library combining Links Notation Environment (lino-env), yargs, and environment variables with a clear priority chain.
 
 [![npm version](https://img.shields.io/npm/v/lino-arguments.svg)](https://www.npmjs.com/package/lino-arguments)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
 
 ## Overview
 
-`lino-arguments` provides a unified configuration approach for command-line applications by combining:
+`lino-arguments` provides a unified configuration system that automatically loads configuration from multiple sources with a clear priority chain:
 
-- **`.lenv` files** - Environment configuration using Links Notation format
-- **Links notation** - A natural, human-readable data format for structured information
-- **yargs** - Powerful command-line argument parsing
-
-This library makes it easy to manage configuration from multiple sources:
-
-1. Environment files (`.lenv`)
-2. Environment variables (using links notation format)
-3. Command-line arguments
-4. Programmatic defaults
+1. **CLI arguments** - Highest priority (manually entered options)
+2. **getenv defaults** - Environment variable lookups with fallbacks
+3. **--configuration flag** - Dynamic .lenv file path via CLI
+4. **`.lenv` file** - Local environment overrides using Links Notation
+5. **`.env` file** - Base configuration (DEPRECATED, use .lenv instead)
 
 ## Installation
 
@@ -28,176 +23,145 @@ npm install lino-arguments
 
 ## Quick Start
 
-### Basic Usage
+### Hero Example
 
 ```javascript
-import { parseLinoArguments, createYargsConfig } from 'lino-arguments';
+import { makeConfig } from 'lino-arguments';
 
-// Parse arguments from links notation format
-const args = parseLinoArguments(`(
-  --verbose
-  --port 3000
-  --host localhost
-)`);
-
-// Use with yargs
-const config = createYargsConfig(['node', 'script.js', ...args])
-  .option('verbose', { type: 'boolean', default: false })
-  .option('port', { type: 'number', default: 8080 })
-  .option('host', { type: 'string', default: '0.0.0.0' })
-  .parse();
-
-console.log(config);
-// { verbose: true, port: 3000, host: 'localhost' }
-```
-
-### Advanced Usage - Merge Multiple Sources
-
-```javascript
-import { mergeAndParse } from 'lino-arguments';
-
-const config = await mergeAndParse({
-  // Define your yargs configuration
-  yargsConfig: (yargs) =>
-    yargs
-      .option('port', { type: 'number', default: 3000 })
-      .option('debug', { type: 'boolean', default: false }),
-
-  // Load from .lenv file
-  lenvPath: '.lenv',
-
-  // Parse overrides from environment variable
-  overridesEnvVar: 'CLI_OVERRIDES',
-
-  // Additional arguments
-  additionalArgs: ['--debug'],
-
-  // Apply .lenv to process.env
-  applyEnvToProcess: true,
+const config = makeConfig({
+  yargs: ({ yargs, getenv }) =>
+    yargs.option('port', { default: getenv('PORT', 3000) }),
 });
 ```
 
+That's it! This simple configuration:
+
+- ✅ Loads from `.lenv` file automatically
+- ✅ Reads `PORT` environment variable with fallback to 3000
+- ✅ Accepts `--port` CLI argument with highest priority
+- ✅ Supports `--configuration` to specify custom .lenv file path
+- ✅ Returns clean object with camelCase keys
+
+### Complete Example
+
+````javascript
+import { makeConfig } from 'lino-arguments';
+
+const config = makeConfig({
+  yargs: ({ yargs, getenv }) =>
+    yargs
+      .option('port', {
+        type: 'number',
+        default: getenv('PORT', 3000),
+        describe: 'Server port'
+      })
+      .option('api-key', {
+        type: 'string',
+        default: getenv('API_KEY', ''),
+        describe: 'API authentication key'
+      })
+      .option('verbose', {
+        type: 'boolean',
+        default: false,
+        describe: 'Enable verbose logging'
+      })
+});
+
+console.log(config);
+// { port: 3000, apiKey: '...', verbose: false }
+
 ## API Reference
 
-### `parseLinoArguments(linoString)`
+### `makeConfig(config)` (Primary API)
 
-Parse arguments from links notation format into an array.
-
-**Parameters:**
-
-- `linoString` (string): String in links notation format
-
-**Returns:** `string[]` - Array of parsed arguments
-
-**Example:**
-
-```javascript
-const args = parseLinoArguments('(\n  --verbose\n  --port 3000\n)');
-// Returns: ['--verbose', '--port', '3000']
-```
-
-### `loadLinoEnv(filePath)`
-
-Load environment configuration from a `.lenv` file.
-
-**Parameters:**
-
-- `filePath` (string): Path to the `.lenv` file (default: `'.lenv'`)
-
-**Returns:** `LinoEnv` - LinoEnv instance with loaded data
-
-**Example:**
-
-```javascript
-const env = loadLinoEnv('.lenv');
-const apiKey = env.get('API_KEY');
-```
-
-### `applyLinoEnv(filePath, options)`
-
-Apply `.lenv` configuration to `process.env`.
-
-**Parameters:**
-
-- `filePath` (string): Path to the `.lenv` file (default: `'.lenv'`)
-- `options` (Object): Options
-  - `override` (boolean): Whether to override existing process.env values (default: `false`)
-
-**Returns:** `Object` - Object containing all loaded environment variables
-
-**Example:**
-
-```javascript
-applyLinoEnv('.lenv', { override: false });
-```
-
-### `parseEnvArguments(envVarName, defaultValue)`
-
-Parse arguments from an environment variable using links notation.
-
-**Parameters:**
-
-- `envVarName` (string): Name of the environment variable
-- `defaultValue` (string): Default value if environment variable is not set
-
-**Returns:** `string[]` - Parsed arguments array
-
-**Example:**
-
-```javascript
-// If process.env.CLI_OVERRIDES = '(\n  --debug\n  --port 8080\n)'
-const overrides = parseEnvArguments('CLI_OVERRIDES');
-// Returns: ['--debug', '--port', '8080']
-```
-
-### `createYargsConfig(argv)`
-
-Create a yargs instance pre-configured with lino-arguments helpers.
-
-**Parameters:**
-
-- `argv` (string[]): Command line arguments (default: `process.argv`)
-
-**Returns:** `Object` - Configured yargs instance
-
-**Example:**
-
-```javascript
-const args = createYargsConfig().option('verbose', { type: 'boolean' }).parse();
-```
-
-### `mergeAndParse(config)`
-
-Merge multiple argument sources and parse with yargs.
+The main function for creating unified configuration from multiple sources.
 
 **Parameters:**
 
 - `config` (Object): Configuration object
-  - `yargsConfig` (Function): Yargs configuration function
-  - `lenvPath` (string): Path to `.lenv` file (optional)
-  - `overridesEnvVar` (string): Environment variable name for overrides (optional)
-  - `additionalArgs` (string[]): Additional arguments to parse (optional)
-  - `applyEnvToProcess` (boolean): Apply `.lenv` to process.env (default: `true`)
+  - `yargs` (Function): Required. Yargs configuration function receiving `({ yargs, getenv })`
+  - `lenv` (Object): Optional. .lenv file configuration
+    - `enabled` (boolean): Enable .lenv loading (default: `true`)
+    - `path` (string): Path to .lenv file (default: `'.lenv'`)
+    - `override` (boolean): Override existing env vars (default: `true`)
+  - `env` (Object): Optional. dotenvx/.env configuration (DEPRECATED)
+    - `enabled` (boolean): Enable .env loading (default: `false`)
+    - `quiet` (boolean): Suppress deprecation warnings (default: `true`)
+  - `getenv` (Object): Optional. getenv helper configuration
+    - `enabled` (boolean): Enable getenv helper (default: `true`)
+  - `argv` (string[]): Optional. Custom argv to parse (default: `process.argv`)
 
-**Returns:** `Promise<Object>` - Parsed arguments
+**Returns:** `Object` - Parsed configuration with camelCase keys
 
 **Example:**
 
 ```javascript
-const args = await mergeAndParse({
-  yargsConfig: (yargs) =>
-    yargs.option('port', { type: 'number', default: 3000 }),
-  lenvPath: '.lenv',
-  overridesEnvVar: 'CLI_OVERRIDES',
-  additionalArgs: ['--verbose'],
+const config = makeConfig({
+  yargs: ({ yargs, getenv }) =>
+    yargs
+      .option('port', { type: 'number', default: getenv('PORT', 3000) })
+      .option('api-key', { type: 'string', default: getenv('API_KEY', '') })
+      .option('verbose', { type: 'boolean', default: false })
 });
+````
+
+### `getenv(name, defaultValue)`
+
+Smart environment variable lookup with type preservation and case conversion.
+
+**Parameters:**
+
+- `name` (string): Environment variable name (any case format)
+- `defaultValue` (any): Default value if not found
+
+**Returns:** Same type as `defaultValue`
+
+**Example:**
+
+```javascript
+// All these work and return the same value:
+getenv('API_KEY', ''); // UPPER_CASE
+getenv('apiKey', ''); // camelCase
+getenv('api-key', ''); // kebab-case
+getenv('api_key', ''); // snake_case
+
+// Type preservation:
+getenv('PORT', 3000); // Returns number
+getenv('DEBUG', false); // Returns boolean
+getenv('API_KEY', ''); // Returns string
 ```
 
-### `loadDotenvx(options)` (DEPRECATED)
+### Case Conversion Utilities
 
-**⚠️ DEPRECATED:** Use Links Notation (`.lenv` files) for environment configuration instead.
+Utility functions for converting between naming conventions:
 
-Load dotenvx configuration. This function displays a deprecation warning.
+- `toUpperCase(str)` - Convert to UPPER_CASE (environment variables)
+- `toCamelCase(str)` - Convert to camelCase (config object keys)
+- `toKebabCase(str)` - Convert to kebab-case (CLI options)
+- `toSnakeCase(str)` - Convert to snake_case
+- `toPascalCase(str)` - Convert to PascalCase
+
+**Example:**
+
+```javascript
+import { toUpperCase, toCamelCase, toKebabCase } from 'lino-arguments';
+
+toUpperCase('apiKey'); // 'API_KEY'
+toCamelCase('api-key'); // 'apiKey'
+toKebabCase('apiKey'); // 'api-key'
+```
+
+### Low-level APIs (Advanced Usage)
+
+These functions are available for advanced use cases but `makeConfig()` is recommended for most applications:
+
+#### `applyLinoEnv(filePath, options)`
+
+Apply `.lenv` file to `process.env`.
+
+#### `loadDotenvx(options)` (DEPRECATED)
+
+**⚠️ DEPRECATED:** Use `.lenv` files instead of `.env` files.
 
 ## `.lenv` File Format
 
@@ -217,61 +181,120 @@ APP_NAME: My Application
 APP_PORT: 3000
 ```
 
-## Examples
+## Features
 
-See the `examples/` directory for complete examples:
+### Multi-source Configuration Loading
 
-- `basic-usage.js` - Simple parsing and yargs integration
-- `advanced-usage.js` - Full workflow with multiple configuration sources
-- `.lenv.example` - Example environment configuration file
-
-## Links Notation Format
-
-Links notation is a natural, human-readable format for structured data. Arguments can be specified in a clean, readable way:
-
-```
-(
-  --verbose
-  --port 3000
-  --host localhost
-)
-```
-
-Or with environment variables:
-
-```bash
-export CLI_OVERRIDES="(
-  --debug
-  --trace
-  --output ./logs
-)"
-```
-
-## Integration Example
-
-Based on the pattern from [hive-mind](https://github.com/deep-assistant/hive-mind), here's how to use lino-arguments in a real application:
+`makeConfig()` automatically loads and merges configuration from multiple sources with a clear priority chain:
 
 ```javascript
-import { mergeAndParse, parseEnvArguments } from 'lino-arguments';
+const config = makeConfig({
+  yargs: ({ yargs, getenv }) =>
+    yargs.option('port', { default: getenv('PORT', 3000) }),
+});
+```
 
-async function main() {
-  // Parse configuration from multiple sources
-  const config = await mergeAndParse({
-    yargsConfig: (yargs) =>
-      yargs
-        .option('port', { type: 'number', default: 3000 })
-        .option('verbose', { type: 'boolean', default: false })
-        .option('debug', { type: 'boolean', default: false }),
-    lenvPath: '.lenv',
-    overridesEnvVar: 'APP_OVERRIDES',
-    applyEnvToProcess: true,
-  });
+**Priority order (highest to lowest):**
 
-  // Start your application with the merged config
-  startApp(config);
-}
+1. CLI arguments: `--port 8080`
+2. getenv defaults: `process.env.PORT`
+3. --configuration flag: `--configuration custom.lenv`
+4. .lenv file: Local environment overrides
+5. .env file: Base configuration (DEPRECATED)
 
-main();
+### Smart Environment Variable Lookup
+
+The `getenv()` helper automatically searches for environment variables in all common case formats:
+
+```javascript
+// If process.env.API_KEY = 'secret123'
+getenv('API_KEY', ''); // ✅ Found
+getenv('apiKey', ''); // ✅ Found (converted to API_KEY)
+getenv('api-key', ''); // ✅ Found (converted to API_KEY)
+getenv('api_key', ''); // ✅ Found (converted to API_KEY)
+```
+
+### Automatic Key Mapping
+
+CLI options in kebab-case are automatically converted to camelCase in the result:
+
+```bash
+$ node app.js --api-key mykey --max-connections 100
+```
+
+```javascript
+const config = makeConfig({
+  yargs: ({ yargs }) =>
+    yargs
+      .option('api-key', { type: 'string' })
+      .option('max-connections', { type: 'number' }),
+});
+
+console.log(config);
+// { apiKey: 'mykey', maxConnections: 100 }
+```
+
+### Dynamic Configuration Files
+
+Use `--configuration` (or `-c`) to specify a different .lenv file at runtime:
+
+```bash
+$ node app.js --configuration production.lenv
+```
+
+## Real-world Example
+
+Here's a complete example based on the [hive-mind](https://github.com/deep-assistant/hive-mind) pattern:
+
+```javascript
+import { makeConfig } from 'lino-arguments';
+
+const config = makeConfig({
+  yargs: ({ yargs, getenv }) =>
+    yargs
+      .option('port', {
+        type: 'number',
+        default: getenv('PORT', 3000),
+        describe: 'Server port',
+      })
+      .option('telegram-token', {
+        type: 'string',
+        default: getenv('TELEGRAM_TOKEN', ''),
+        describe: 'Telegram bot token',
+      })
+      .option('api-key', {
+        type: 'string',
+        default: getenv('API_KEY', ''),
+        describe: 'API authentication key',
+      })
+      .option('verbose', {
+        type: 'boolean',
+        default: false,
+        describe: 'Enable verbose logging',
+      })
+      .option('debug', {
+        type: 'boolean',
+        default: false,
+        describe: 'Enable debug mode',
+      }),
+});
+
+// Start your application
+startServer(config);
+```
+
+Create a `.lenv` file for local development:
+
+```
+PORT: 3000
+TELEGRAM_TOKEN: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+API_KEY: dev_key_12345
+```
+
+Override values via CLI:
+
+```bash
+$ node app.js --port 8080 --verbose
 ```
 
 ## Testing
