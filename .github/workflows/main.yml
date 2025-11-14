@@ -178,7 +178,7 @@ jobs:
         run: npm install
 
       - name: Run tests
-        run: deno test --allow-read
+        run: deno test --allow-read --allow-env
 
   # Release - only runs on main after tests pass
   release:
