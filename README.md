@@ -309,7 +309,7 @@ npm test
 bun test
 
 # Run tests on Deno
-deno test --allow-read
+deno test --allow-read --allow-env
 ```
 
 ## Development

@@ -37,7 +37,7 @@
   },
   "dependencies": {
     "links-notation": "^0.11.2",
-    "lino-env": "^0.2.0",
+    "lino-env": "^0.2.5",
     "yargs": "^17.7.2"
   },
   "peerDependencies": {
