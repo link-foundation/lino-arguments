@@ -1,0 +1,75 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      description:
+        description: 'Release description (optional)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-changeset:
+    name: Create Changeset
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Create changeset
+        run: |
+          if [ -n "${{ inputs.description }}" ]; then
+            node scripts/create-manual-changeset.mjs "${{ inputs.bump_type }}" "${{ inputs.description }}"
+          else
+            node scripts/create-manual-changeset.mjs "${{ inputs.bump_type }}"
+          fi
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: 'chore: create changeset for ${{ inputs.bump_type }} release'
+          branch: changeset-release/manual-${{ github.run_id }}
+          title: 'chore: ${{ inputs.bump_type }} release'
+          body: |
+            ## Manual Release Request
+
+            **Release Type:** `${{ inputs.bump_type }}`
+            **Description:** ${{ inputs.description || 'Manual release' }}
+            **Requested by:** @${{ github.actor }}
+
+            This PR contains a changeset for a manual ${{ inputs.bump_type }} release.
+
+            ### Next Steps
+
+            1. Review the changeset file
+            2. Merge this PR to main
+            3. The automated release workflow will:
+               - Bump the version
+               - Update the CHANGELOG
+               - Publish to npm
+               - Create a GitHub release
+
+            ---
+
+            🤖 Generated with [Claude Code](https://claude.com/claude-code)
