@@ -152,7 +152,7 @@ export function getenv(key, defaultValue = '') {
 
         // Otherwise use getenv.string
         return baseGetenv.string(variant, defaultValue);
-      } catch (_error) {
+      } catch {
         // If getenv throws, return the default value
         return defaultValue;
       }
@@ -177,7 +177,7 @@ function loadLinoEnv(filePath = '.lenv') {
     const env = new LinoEnv(filePath);
     env.read();
     return env;
-  } catch (_error) {
+  } catch {
     return null;
   }
 }
@@ -250,7 +250,7 @@ async function loadDotenvx(options = {}) {
   try {
     const dotenvx = await import('@dotenvx/dotenvx');
     return dotenvx.config({ ...options, quiet: true });
-  } catch (_error) {
+  } catch {
     if (!quiet) {
       console.error('⚠️  dotenvx not installed, skipping .env loading');
     }
@@ -347,7 +347,7 @@ export function makeConfig(config = {}) {
   let initialParsed;
   try {
     initialParsed = initialYargs.parseSync();
-  } catch (_error) {
+  } catch {
     initialParsed = {};
   }
 
@@ -422,7 +422,7 @@ export function parseLinoArguments(linoString) {
     return args.filter(
       (arg) => arg && arg.trim() && !arg.trim().startsWith('#')
     );
-  } catch (_error) {
+  } catch {
     return linoString
       .split('\n')
       .map((line) => line.trim())
