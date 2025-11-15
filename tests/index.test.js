@@ -11,7 +11,7 @@ import {
   toSnakeCase,
   toPascalCase,
   parseLinoArguments,
-} from './index.js';
+} from '../src/index.js';
 
 // ============================================================================
 // Case Conversion Tests

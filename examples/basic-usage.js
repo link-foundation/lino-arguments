@@ -2,7 +2,7 @@ import {
   parseLinoArguments,
   createYargsConfig,
   applyLinoEnv,
-} from '../index.js';
+} from '../src/index.js';
 
 /**
  * Basic usage example showing how to parse links notation arguments

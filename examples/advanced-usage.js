@@ -1,4 +1,4 @@
-import { mergeAndParse, parseEnvArguments } from '../index.js';
+import { mergeAndParse, parseEnvArguments } from '../src/index.js';
 
 /**
  * Advanced usage example demonstrating the full power of lino-arguments
