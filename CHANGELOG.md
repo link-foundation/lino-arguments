@@ -1,5 +1,11 @@
 # lino-arguments
 
+## 0.2.1
+
+### Patch Changes
+
+- 7b0868d: Replace custom getenv implementation with official npm package. Now uses the robust `getenv` package for type casting and validation, enhanced with case-insensitive lookup across multiple naming conventions. Also enforces stricter no-unused-vars linting with catch { } syntax.
+
 ## 0.2.0
 
 ### Minor Changes
