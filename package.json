@@ -36,6 +36,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "getenv": "^2.0.0",
     "links-notation": "^0.11.2",
     "lino-env": "^0.2.6",
     "yargs": "^17.7.2"

@@ -2,6 +2,7 @@ import { Parser } from 'links-notation';
 import { LinoEnv } from 'lino-env';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import baseGetenv from 'getenv';
 
 /**
  * lino-arguments - A unified configuration library
@@ -108,7 +109,8 @@ export function toPascalCase(str) {
 
 /**
  * Get environment variable with default value and case conversion
- * Tries multiple case formats to find the variable
+ * Uses the official getenv npm package internally, with enhanced case-insensitive lookup.
+ * Tries multiple case formats to find the variable.
  *
  * @param {string} key - Variable name (any case format)
  * @param {string|number|boolean} [defaultValue=''] - Default value if not found
@@ -130,29 +132,30 @@ export function getenv(key, defaultValue = '') {
     toPascalCase(key), // PascalCase
   ];
 
+  // Try to find the variable using any case variant
   for (const variant of variants) {
     if (process.env[variant] !== undefined) {
-      const value = process.env[variant];
-
-      // If default is a number, try to parse the env value as a number
-      if (typeof defaultValue === 'number') {
-        const parsed = Number(value);
-        return isNaN(parsed) ? defaultValue : parsed;
-      }
-
-      // If default is a boolean, try to parse the env value as a boolean
-      if (typeof defaultValue === 'boolean') {
-        if (value.toLowerCase() === 'true') {
-          return true;
+      // Use the official getenv package based on the type of defaultValue
+      try {
+        if (typeof defaultValue === 'number') {
+          // Use getenv.int or getenv.float
+          const isFloat = !Number.isInteger(defaultValue);
+          return isFloat
+            ? baseGetenv.float(variant, defaultValue)
+            : baseGetenv.int(variant, defaultValue);
         }
-        if (value.toLowerCase() === 'false') {
-          return false;
+
+        if (typeof defaultValue === 'boolean') {
+          // Use getenv.boolish for flexible boolean parsing
+          return baseGetenv.boolish(variant, defaultValue);
         }
+
+        // Otherwise use getenv.string
+        return baseGetenv.string(variant, defaultValue);
+      } catch (_error) {
+        // If getenv throws, return the default value
         return defaultValue;
       }
-
-      // Otherwise return as string
-      return value;
     }
   }
 
