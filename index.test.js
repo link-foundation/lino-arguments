@@ -550,8 +550,14 @@ describe('makeConfig', () => {
         let config = makeConfig({
           yargs: ({ yargs, getenv }) =>
             yargs
-              .option('port', { type: 'number', default: getenv('APP_PORT', 0) })
-              .option('host', { type: 'string', default: getenv('APP_HOST', '') })
+              .option('port', {
+                type: 'number',
+                default: getenv('APP_PORT', 0),
+              })
+              .option('host', {
+                type: 'string',
+                default: getenv('APP_HOST', ''),
+              })
               .option('name', {
                 type: 'string',
                 default: getenv('APP_NAME', ''),
@@ -573,8 +579,14 @@ describe('makeConfig', () => {
         config = makeConfig({
           yargs: ({ yargs, getenv }) =>
             yargs
-              .option('port', { type: 'number', default: getenv('APP_PORT', 0) })
-              .option('host', { type: 'string', default: getenv('APP_HOST', '') })
+              .option('port', {
+                type: 'number',
+                default: getenv('APP_PORT', 0),
+              })
+              .option('host', {
+                type: 'string',
+                default: getenv('APP_HOST', ''),
+              })
               .option('name', {
                 type: 'string',
                 default: getenv('APP_NAME', ''),
@@ -596,8 +608,14 @@ describe('makeConfig', () => {
         config = makeConfig({
           yargs: ({ yargs, getenv }) =>
             yargs
-              .option('port', { type: 'number', default: getenv('APP_PORT', 0) })
-              .option('host', { type: 'string', default: getenv('APP_HOST', '') })
+              .option('port', {
+                type: 'number',
+                default: getenv('APP_PORT', 0),
+              })
+              .option('host', {
+                type: 'string',
+                default: getenv('APP_HOST', ''),
+              })
               .option('name', {
                 type: 'string',
                 default: getenv('APP_NAME', ''),
