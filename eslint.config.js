@@ -30,14 +30,7 @@ export default [
       'prettier/prettier': 'error',
 
       // Code quality rules
-      'no-unused-vars': [
-        'error',
-        {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
-        },
-      ],
+      'no-unused-vars': 'error', // No exceptions - use catch { } for ignored errors
       'no-console': 'off', // Allow console in this project
       'no-debugger': 'error',
 

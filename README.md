@@ -109,6 +109,8 @@ const config = makeConfig({
 
 Smart environment variable lookup with type preservation and case conversion.
 
+**Built on [getenv](https://www.npmjs.com/package/getenv):** This function uses the official `getenv` npm package internally for robust type casting and validation, enhanced with case-insensitive lookup across multiple naming conventions.
+
 **Parameters:**
 
 - `name` (string): Environment variable name (any case format)
@@ -125,10 +127,10 @@ getenv('apiKey', ''); // camelCase
 getenv('api-key', ''); // kebab-case
 getenv('api_key', ''); // snake_case
 
-// Type preservation:
-getenv('PORT', 3000); // Returns number
-getenv('DEBUG', false); // Returns boolean
-getenv('API_KEY', ''); // Returns string
+// Type preservation (powered by getenv package):
+getenv('PORT', 3000); // Returns number (uses getenv.int())
+getenv('DEBUG', false); // Returns boolean (uses getenv.boolish())
+getenv('API_KEY', ''); // Returns string (uses getenv.string())
 ```
 
 ### Case Conversion Utilities
@@ -351,6 +353,7 @@ npm run changeset:status
 - [links-notation](https://github.com/link-foundation/links-notation) - Links Notation parser
 - [lino-env](https://github.com/link-foundation/lino-env) - .lenv file operations
 - [test-anywhere](https://github.com/link-foundation/test-anywhere) - Universal JavaScript testing
+- [getenv](https://www.npmjs.com/package/getenv) - Environment variable helper with type casting (used internally)
 
 ## License
 
