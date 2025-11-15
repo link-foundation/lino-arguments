@@ -1,5 +1,11 @@
 # lino-arguments
 
+## 0.2.2
+
+### Patch Changes
+
+- b08f95c: Adapt CI/CD pipeline for npm trusted publishing with provenance support. Replace shell script changeset validation with .mjs script. Add manual release workflow and helper scripts for changeset management.
+
 ## 0.2.1
 
 ### Patch Changes
