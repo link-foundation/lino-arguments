@@ -1,5 +1,11 @@
 # lino-arguments
 
+## 0.2.3
+
+### Patch Changes
+
+- 51aa1bd: Test patch release
+
 ## 0.2.2
 
 ### Patch Changes
