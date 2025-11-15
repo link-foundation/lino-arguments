@@ -19,7 +19,9 @@
     "changeset": "changeset",
     "changeset:version": "node scripts/changeset-version.mjs",
     "changeset:publish": "changeset publish",
-    "changeset:status": "changeset status --since=origin/main"
+    "changeset:status": "changeset status --since=origin/main",
+    "changeset:validate": "node scripts/validate-changeset.mjs",
+    "changeset:create": "node scripts/create-manual-changeset.mjs"
   },
   "keywords": [
     "lino",
