@@ -221,8 +221,9 @@ jobs:
           # Pull the latest changes we just pushed
           git pull origin main
 
-          # Publish to npm using OIDC trusted publishing with provenance
-          npm run changeset:publish --provenance
+          # Publish to npm using OIDC trusted publishing
+          # Note: Provenance is automatically generated when using OIDC (id-token: write)
+          npm run changeset:publish
 
           echo "published=true" >> $GITHUB_OUTPUT
 
