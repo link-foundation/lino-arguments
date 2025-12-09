@@ -5,6 +5,7 @@
 This document provides a comprehensive analysis of Issue #10: "Trusted publishing does not work in our CI/CD", covering multiple failure scenarios, their root causes, and evidence-based solutions drawn from CI logs, workflow comparison, and online research.
 
 **Status**: ✅ **PARTIALLY RESOLVED**
+
 - **Original E422 Error**: ✅ Fixed in PR #11
 - **npm Package**: ✅ Successfully published version 0.2.5 with provenance
 - **Automated CI/CD**: ✅ Working correctly on main branch
@@ -12,11 +13,11 @@ This document provides a comprehensive analysis of Issue #10: "Trusted publishin
 
 ## Issue Timeline
 
-| Date/Time (UTC) | Event | Status | CI Run | Details |
-|-----------------|-------|--------|---------|---------|
-| 2025-12-09 06:27:13 | Automated release attempt v0.2.4 | ❌ Failed | [#20054176340](https://github.com/link-foundation/lino-arguments/actions/runs/20054176340) | E422: Missing repository field |
-| 2025-12-09 06:57:00 | PR #11 merged (added repository field) | ✅ Success | [#20054779258](https://github.com/link-foundation/lino-arguments/actions/runs/20054779258) | Published v0.2.5 successfully |
-| 2025-12-09 07:03:31 | Manual instant release v0.2.6 | ❌ Failed | [#20054899930](https://github.com/link-foundation/lino-arguments/actions/runs/20054899930) | E404: Access token expired/revoked |
+| Date/Time (UTC)     | Event                                  | Status     | CI Run                                                                                     | Details                            |
+| ------------------- | -------------------------------------- | ---------- | ------------------------------------------------------------------------------------------ | ---------------------------------- |
+| 2025-12-09 06:27:13 | Automated release attempt v0.2.4       | ❌ Failed  | [#20054176340](https://github.com/link-foundation/lino-arguments/actions/runs/20054176340) | E422: Missing repository field     |
+| 2025-12-09 06:57:00 | PR #11 merged (added repository field) | ✅ Success | [#20054779258](https://github.com/link-foundation/lino-arguments/actions/runs/20054779258) | Published v0.2.5 successfully      |
+| 2025-12-09 07:03:31 | Manual instant release v0.2.6          | ❌ Failed  | [#20054899930](https://github.com/link-foundation/lino-arguments/actions/runs/20054899930) | E404: Access token expired/revoked |
 
 ## Part 1: The E422 Error - Missing Repository Field (RESOLVED ✅)
 
@@ -51,6 +52,7 @@ graph TD
 ```
 
 **OIDC JWT Claims Include:**
+
 - `repository`: `link-foundation/lino-arguments`
 - `workflow`: `.github/workflows/main.yml`
 - `ref`: `refs/heads/main`
@@ -60,13 +62,13 @@ graph TD
 
 For npm provenance with OIDC trusted publishing:
 
-| Requirement | Status | Notes |
-|-------------|--------|-------|
-| `id-token: write` permission | ✅ | Line 149 in main.yml |
-| npm CLI version ≥ 11.5.1 | ✅ | Upgraded via `npm install -g npm@latest` |
-| `repository` field in package.json | ❌→✅ | **Missing** → Added in PR #11 |
-| Trusted publisher configured on npmjs.com | ✅ | Confirmed in screenshot |
-| Publishing from public repository | ✅ | link-foundation/lino-arguments is public |
+| Requirement                               | Status | Notes                                    |
+| ----------------------------------------- | ------ | ---------------------------------------- |
+| `id-token: write` permission              | ✅     | Line 149 in main.yml                     |
+| npm CLI version ≥ 11.5.1                  | ✅     | Upgraded via `npm install -g npm@latest` |
+| `repository` field in package.json        | ❌→✅  | **Missing** → Added in PR #11            |
+| Trusted publisher configured on npmjs.com | ✅     | Confirmed in screenshot                  |
+| Publishing from public repository         | ✅     | link-foundation/lino-arguments is public |
 
 ### The Fix (PR #11)
 
@@ -84,6 +86,7 @@ Added required `repository` field to `package.json`:
 ### Verification of Fix
 
 After PR #11 merge:
+
 - ✅ CI Run #20054779258 succeeded
 - ✅ Published lino-arguments@0.2.5 with provenance
 - ✅ Provenance attestation verified on Sigstore
@@ -115,6 +118,7 @@ npm notice Access token expired or revoked. Please try logging in again.
 ### Key Facts from CI Logs
 
 **From run #20054899930 (lines 293):**
+
 ```
 npm notice Access token expired or revoked. Please try logging in again.
 npm error code E404
@@ -122,6 +126,7 @@ npm error 404 Not Found - PUT https://registry.npmjs.org/lino-arguments
 ```
 
 **Context:**
+
 - Trigger: `workflow_dispatch` (manual)
 - Permissions: ✅ `id-token: write` present
 - npm version: ✅ Latest (11.x)
@@ -143,20 +148,21 @@ From [npm docs](https://docs.npmjs.com/trusted-publishers/) and [GitHub communit
 #### Why E404 Instead of E403?
 
 npm returns E404 ("Not found") instead of E403 ("Forbidden") for security reasons:
+
 - Prevents leaking information about package existence
 - Standard practice for authentication failures
 - The "Access token expired or revoked" message reveals the real issue
 
 #### Comparison: Automated vs Manual
 
-| Aspect | main.yml (push trigger) | manual-release.yml (workflow_dispatch) |
-|--------|------------------------|----------------------------------------|
-| Trigger Event | `push` to main | `workflow_dispatch` |
-| OIDC JWT `event_name` claim | `push` | `workflow_dispatch` |
-| npm Trusted Publisher config | ✅ Matches | ❓ May not match |
-| Authentication Method | OIDC only | OIDC only |
-| Success Rate | ✅ 100% | ❌ 0% |
-| Logs | Clean publish | E404 authentication error |
+| Aspect                       | main.yml (push trigger) | manual-release.yml (workflow_dispatch) |
+| ---------------------------- | ----------------------- | -------------------------------------- |
+| Trigger Event                | `push` to main          | `workflow_dispatch`                    |
+| OIDC JWT `event_name` claim  | `push`                  | `workflow_dispatch`                    |
+| npm Trusted Publisher config | ✅ Matches              | ❓ May not match                       |
+| Authentication Method        | OIDC only               | OIDC only                              |
+| Success Rate                 | ✅ 100%                 | ❌ 0%                                  |
+| Logs                         | Clean publish           | E404 authentication error              |
 
 ### Possible Causes
 
@@ -178,6 +184,7 @@ npm returns E404 ("Not found") instead of E403 ("Forbidden") for security reason
 The [test-anywhere repository](https://github.com/link-foundation/test-anywhere) uses a **different authentication strategy**:
 
 **test-anywhere `common.yml` (lines 160-161):**
+
 ```yaml
 env:
   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -185,6 +192,7 @@ env:
 ```
 
 **Key differences:**
+
 - ✅ Uses traditional NPM_TOKEN authentication
 - ✅ Works for **all** workflow trigger types
 - ❌ Requires managing long-lived tokens
@@ -195,6 +203,7 @@ env:
 ### Strategy 1: NPM_TOKEN (Traditional)
 
 **Implementation:**
+
 ```yaml
 - name: Publish to npm
   env:
@@ -203,12 +212,14 @@ env:
 ```
 
 **Pros:**
+
 - ✅ Works reliably for all workflow types (`push`, `workflow_dispatch`, `schedule`, etc.)
 - ✅ Simple setup - just add secret
 - ✅ Consistent behavior
 - ✅ Well-documented
 
 **Cons:**
+
 - ❌ Requires managing long-lived tokens
 - ❌ Manual token rotation needed
 - ❌ Token compromise risk
@@ -218,6 +229,7 @@ env:
 ### Strategy 2: OIDC Trusted Publishing (Modern)
 
 **Implementation:**
+
 ```yaml
 permissions:
   id-token: write
@@ -229,6 +241,7 @@ permissions:
 ```
 
 **Pros:**
+
 - ✅ No long-lived tokens to manage
 - ✅ Automatic provenance attestation
 - ✅ More secure (short-lived tokens)
@@ -236,6 +249,7 @@ permissions:
 - ✅ Supply chain security benefits
 
 **Cons:**
+
 - ❌ Requires Trusted Publisher config on npmjs.com
 - ❌ May not work for all workflow trigger types
 - ❌ Configuration complexity
@@ -245,6 +259,7 @@ permissions:
 ### Strategy 3: Hybrid Approach (Recommended)
 
 **Implementation:**
+
 ```yaml
 permissions:
   id-token: write
@@ -258,12 +273,14 @@ permissions:
 ```
 
 **Pros:**
+
 - ✅ Best of both worlds
 - ✅ OIDC for automated releases
 - ✅ NPM_TOKEN fallback for manual/edge cases
 - ✅ Maximum reliability
 
 **Cons:**
+
 - ⚠️ Still need to manage NPM_TOKEN
 - ⚠️ Slight configuration overhead
 
@@ -278,7 +295,7 @@ release:
   permissions:
     contents: write
     pull-requests: write
-    id-token: write  # ← Enables OIDC
+    id-token: write # ← Enables OIDC
 
   steps:
     - name: Setup Node.js
@@ -312,24 +329,24 @@ release:
 
 ### E422 Error (RESOLVED ✅)
 
-| Factor | Finding |
-|--------|---------|
-| **Symptom** | E422 "repository.url is ''" |
-| **Root Cause** | Missing `repository` field in package.json |
-| **Fix** | Added repository field |
-| **Prevention** | Always include repository in package.json |
-| **Verification** | npm view shows published versions |
+| Factor           | Finding                                    |
+| ---------------- | ------------------------------------------ |
+| **Symptom**      | E422 "repository.url is ''"                |
+| **Root Cause**   | Missing `repository` field in package.json |
+| **Fix**          | Added repository field                     |
+| **Prevention**   | Always include repository in package.json  |
+| **Verification** | npm view shows published versions          |
 
 ### E404 Error (ONGOING ❌)
 
-| Factor | Finding |
-|--------|---------|
-| **Symptom** | E404 "Access token expired or revoked" |
-| **Root Cause** | OIDC authentication fails for `workflow_dispatch` trigger |
+| Factor           | Finding                                                      |
+| ---------------- | ------------------------------------------------------------ |
+| **Symptom**      | E404 "Access token expired or revoked"                       |
+| **Root Cause**   | OIDC authentication fails for `workflow_dispatch` trigger    |
 | **Hypothesis 1** | Trusted Publisher config doesn't authorize workflow_dispatch |
-| **Hypothesis 2** | Workflow file mismatch (manual-release.yml vs main.yml) |
-| **Hypothesis 3** | Missing environment specification |
-| **Confirmed** | Automated releases work, manual releases fail |
+| **Hypothesis 2** | Workflow file mismatch (manual-release.yml vs main.yml)      |
+| **Hypothesis 3** | Missing environment specification                            |
+| **Confirmed**    | Automated releases work, manual releases fail                |
 
 ## Part 6: Proposed Solutions
 
@@ -342,7 +359,7 @@ release:
 - name: Publish to npm
   if: steps.version.outputs.version_committed == 'true'
   env:
-    NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}  # ← Add this
+    NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} # ← Add this
   run: npm run changeset:publish
 ```
 
@@ -384,10 +401,10 @@ jobs:
       id-token: write
       contents: write
       pull-requests: write
-    
+
     steps:
       # ... common setup steps ...
-      
+
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -396,13 +413,15 @@ jobs:
 
 Then both main.yml and manual-release.yml call this reusable workflow.
 
-**Pros:** 
+**Pros:**
+
 - Single source of truth
 - Pattern used successfully in test-anywhere
 - Works for all trigger types
 - Easier to maintain
 
-**Cons:** 
+**Cons:**
+
 - Requires workflow refactoring
 - Still needs NPM_TOKEN management
 
@@ -416,17 +435,19 @@ changeset-pr:
   steps:
     - name: Create changeset file
       run: node scripts/create-manual-changeset.mjs ...
-    
+
     - name: Create Pull Request
       # Let automated workflow handle actual publishing
 ```
 
-**Pros:** 
+**Pros:**
+
 - Maintains OIDC-only for actual publishes
 - Proven to work
 - PR review before release
 
-**Cons:** 
+**Cons:**
+
 - No true "instant" manual releases
 - Extra step required
 
@@ -437,6 +458,7 @@ changeset-pr:
 **Finding:** The `repository` field is mandatory for npm provenance, even though not explicitly required in basic package.json schema.
 
 **Action for all projects:**
+
 ```json
 {
   "repository": {
@@ -450,7 +472,8 @@ changeset-pr:
 
 **Finding:** npm Trusted Publishers authorize specific workflows and may not work identically for all trigger types.
 
-**Action:** 
+**Action:**
+
 - Test all workflow paths before production
 - Consider NPM_TOKEN fallback for manual/edge case workflows
 - Document which workflows are OIDC-ready
@@ -460,6 +483,7 @@ changeset-pr:
 **Finding:** npm returns E404 instead of E403 for security, but "Access token expired or revoked" reveals auth issues.
 
 **Action when debugging:**
+
 1. Check "Access token" messages in logs
 2. Verify Trusted Publisher configuration
 3. Confirm workflow file and environment match npm settings
@@ -470,6 +494,7 @@ changeset-pr:
 **Finding:** Automated workflows (push) may succeed while manual workflows (workflow_dispatch) fail with identical configuration.
 
 **Action:**
+
 - Create test packages for CI/CD validation
 - Run manual release tests before relying on them
 - Document known limitations
@@ -479,6 +504,7 @@ changeset-pr:
 **Finding:** test-anywhere's NPM_TOKEN approach works reliably, providing a proven fallback pattern.
 
 **Action:**
+
 - Study working examples in organization
 - Adopt proven patterns
 - Create shared/reusable workflows
@@ -567,6 +593,6 @@ Issue #10 represents a valuable learning opportunity for understanding npm's mod
 
 ---
 
-*Last Updated: 2025-12-09*  
-*Case Study Author: AI Issue Solver*  
-*Related: Issue #10, PR #11, PR #12*
+_Last Updated: 2025-12-09_  
+_Case Study Author: AI Issue Solver_  
+_Related: Issue #10, PR #11, PR #12_
