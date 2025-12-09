@@ -1,0 +1,202 @@
+Check for Changesets	Set up job	﻿2025-12-09T06:43:32.8521210Z Current runner version: '2.329.0'
+Check for Changesets	Set up job	2025-12-09T06:43:32.8545536Z ##[group]Runner Image Provisioner
+Check for Changesets	Set up job	2025-12-09T06:43:32.8546478Z Hosted Compute Agent
+Check for Changesets	Set up job	2025-12-09T06:43:32.8546963Z Version: 20251124.448
+Check for Changesets	Set up job	2025-12-09T06:43:32.8547507Z Commit: fda5086b43ec66ade217e5fcd18146c879571177
+Check for Changesets	Set up job	2025-12-09T06:43:32.8548184Z Build Date: 2025-11-24T21:16:26Z
+Check for Changesets	Set up job	2025-12-09T06:43:32.8548711Z ##[endgroup]
+Check for Changesets	Set up job	2025-12-09T06:43:32.8549150Z ##[group]Operating System
+Check for Changesets	Set up job	2025-12-09T06:43:32.8549688Z Ubuntu
+Check for Changesets	Set up job	2025-12-09T06:43:32.8550084Z 24.04.3
+Check for Changesets	Set up job	2025-12-09T06:43:32.8550651Z LTS
+Check for Changesets	Set up job	2025-12-09T06:43:32.8551123Z ##[endgroup]
+Check for Changesets	Set up job	2025-12-09T06:43:32.8551535Z ##[group]Runner Image
+Check for Changesets	Set up job	2025-12-09T06:43:32.8552040Z Image: ubuntu-24.04
+Check for Changesets	Set up job	2025-12-09T06:43:32.8552475Z Version: 20251126.144.1
+Check for Changesets	Set up job	2025-12-09T06:43:32.8553380Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20251126.144/images/ubuntu/Ubuntu2404-Readme.md
+Check for Changesets	Set up job	2025-12-09T06:43:32.8554558Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20251126.144
+Check for Changesets	Set up job	2025-12-09T06:43:32.8555662Z ##[endgroup]
+Check for Changesets	Set up job	2025-12-09T06:43:32.8557895Z ##[group]GITHUB_TOKEN Permissions
+Check for Changesets	Set up job	2025-12-09T06:43:32.8560019Z Actions: write
+Check for Changesets	Set up job	2025-12-09T06:43:32.8560771Z ArtifactMetadata: write
+Check for Changesets	Set up job	2025-12-09T06:43:32.8561445Z Attestations: write
+Check for Changesets	Set up job	2025-12-09T06:43:32.8561894Z Checks: write
+Check for Changesets	Set up job	2025-12-09T06:43:32.8562352Z Contents: write
+Check for Changesets	Set up job	2025-12-09T06:43:32.8562773Z Deployments: write
+Check for Changesets	Set up job	2025-12-09T06:43:32.8563292Z Discussions: write
+Check for Changesets	Set up job	2025-12-09T06:43:32.8563728Z Issues: write
+Check for Changesets	Set up job	2025-12-09T06:43:32.8564195Z Metadata: read
+Check for Changesets	Set up job	2025-12-09T06:43:32.8564685Z Models: read
+Check for Changesets	Set up job	2025-12-09T06:43:32.8565085Z Packages: write
+Check for Changesets	Set up job	2025-12-09T06:43:32.8565526Z Pages: write
+Check for Changesets	Set up job	2025-12-09T06:43:32.8565985Z PullRequests: write
+Check for Changesets	Set up job	2025-12-09T06:43:32.8566467Z RepositoryProjects: write
+Check for Changesets	Set up job	2025-12-09T06:43:32.8567075Z SecurityEvents: write
+Check for Changesets	Set up job	2025-12-09T06:43:32.8567586Z Statuses: write
+Check for Changesets	Set up job	2025-12-09T06:43:32.8568035Z ##[endgroup]
+Check for Changesets	Set up job	2025-12-09T06:43:32.8570173Z Secret source: Actions
+Check for Changesets	Set up job	2025-12-09T06:43:32.8571062Z Prepare workflow directory
+Check for Changesets	Set up job	2025-12-09T06:43:32.8929927Z Prepare all required actions
+Check for Changesets	Set up job	2025-12-09T06:43:32.8979738Z Getting action download info
+Check for Changesets	Set up job	2025-12-09T06:43:33.2678205Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+Check for Changesets	Set up job	2025-12-09T06:43:34.0835940Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+Check for Changesets	Set up job	2025-12-09T06:43:34.2418138Z Complete job name: Check for Changesets
+Check for Changesets	Run actions/checkout@v4	﻿2025-12-09T06:43:34.3195907Z ##[group]Run actions/checkout@v4
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.3197320Z with:
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.3198280Z   fetch-depth: 0
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.3199202Z   repository: link-foundation/lino-arguments
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.3201275Z   token: ***
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.3202261Z   ssh-strict: true
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.3203097Z   ssh-user: git
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.3203966Z   persist-credentials: true
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.3204956Z   clean: true
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.3205846Z   sparse-checkout-cone-mode: true
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.3206869Z   fetch-tags: false
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.3207792Z   show-progress: true
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.3208753Z   lfs: false
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.3209557Z   submodules: false
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.3210613Z   set-safe-directory: true
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.3211972Z ##[endgroup]
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4290908Z Syncing repository: link-foundation/lino-arguments
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4294286Z ##[group]Getting Git version info
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4295894Z Working directory is '/home/runner/work/lino-arguments/lino-arguments'
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4413994Z [command]/usr/bin/git version
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4415797Z git version 2.52.0
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4420484Z ##[endgroup]
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4428559Z Temporarily overriding HOME='/home/runner/work/_temp/d1e83598-0e55-44e8-91d5-51a23e432170' before making global git config changes
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4431431Z Adding repository directory to the temporary git global config as a safe directory
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4433647Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/lino-arguments/lino-arguments
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4463961Z Deleting the contents of '/home/runner/work/lino-arguments/lino-arguments'
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4467244Z ##[group]Initializing the repository
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4471579Z [command]/usr/bin/git init /home/runner/work/lino-arguments/lino-arguments
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4581339Z hint: Using 'master' as the name for the initial branch. This default branch name
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4585436Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4588912Z hint: to use in all of your new repositories, which will suppress this warning,
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4591971Z hint: call:
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4593548Z hint:
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4595268Z hint: 	git config --global init.defaultBranch <name>
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4597585Z hint:
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4599965Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4603006Z hint: 'development'. The just-created branch can be renamed via this command:
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4605104Z hint:
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4606299Z hint: 	git branch -m <name>
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4607257Z hint:
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4608445Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4610690Z Initialized empty Git repository in /home/runner/work/lino-arguments/lino-arguments/.git/
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4616077Z [command]/usr/bin/git remote add origin https://github.com/link-foundation/lino-arguments
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4636827Z ##[endgroup]
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4639062Z ##[group]Disabling automatic garbage collection
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4641489Z [command]/usr/bin/git config --local gc.auto 0
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4669822Z ##[endgroup]
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4672213Z ##[group]Setting up auth
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4677753Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.4705625Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.5019494Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.5046304Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.5235066Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.5261715Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.5442874Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.5471587Z ##[endgroup]
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.5473004Z ##[group]Fetching the repository
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:34.5481116Z [command]/usr/bin/git -c protocol.version=2 fetch --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/* +ada2ace609c8a9f13a091ac24a59bde5502f230b:refs/remotes/pull/11/merge
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0855401Z From https://github.com/link-foundation/lino-arguments
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0856379Z  * [new branch]      changeset-release/manual-19391025857     -> origin/changeset-release/manual-19391025857
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0857133Z  * [new branch]      claude/adapt-cicd-publish-01J44V2DMtPscSchmkVg14wj -> origin/claude/adapt-cicd-publish-01J44V2DMtPscSchmkVg14wj
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0858087Z  * [new branch]      claude/use-getenv-npm-package-01Nt3cRMXpLUepTDxw8SGgJq -> origin/claude/use-getenv-npm-package-01Nt3cRMXpLUepTDxw8SGgJq
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0858855Z  * [new branch]      issue-1-171e0c1cad4c                     -> origin/issue-1-171e0c1cad4c
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0859383Z  * [new branch]      issue-10-d4419a0e77c2                    -> origin/issue-10-d4419a0e77c2
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0859877Z  * [new branch]      issue-6-88ce301275b5                     -> origin/issue-6-88ce301275b5
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0860882Z  * [new branch]      issue-6-ed79da598197                     -> origin/issue-6-ed79da598197
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0861362Z  * [new branch]      issue-6-ef625c0a060f                     -> origin/issue-6-ef625c0a060f
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0861795Z  * [new branch]      main                                     -> origin/main
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0862200Z  * [new ref]         ada2ace609c8a9f13a091ac24a59bde5502f230b -> pull/11/merge
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0893847Z ##[endgroup]
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0894625Z ##[group]Determining the checkout info
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0895405Z ##[endgroup]
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0900306Z [command]/usr/bin/git sparse-checkout disable
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0938725Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0962545Z ##[group]Checking out the ref
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.0966695Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/11/merge
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1017486Z Note: switching to 'refs/remotes/pull/11/merge'.
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1017972Z 
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1018228Z You are in 'detached HEAD' state. You can look around, make experimental
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1018818Z changes and commit them, and you can discard any commits you make in this
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1019545Z state without impacting any branches by switching back to a branch.
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1020175Z 
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1020895Z If you want to create a new branch to retain commits you create, you may
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1021619Z do so (now or later) by using -c with the switch command. Example:
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1021997Z 
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1022201Z   git switch -c <new-branch-name>
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1022475Z 
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1022646Z Or undo this operation with:
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1022935Z 
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1023069Z   git switch -
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1023258Z 
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1023591Z Turn off this advice by setting config variable advice.detachedHead to false
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1024042Z 
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1024525Z HEAD is now at ada2ace Merge 9b140e10cd5536fe725a8bae35cbde9ef2d5559a into fb7bfa098fd50bd93bbd566d6c095a4445edd454
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1026467Z ##[endgroup]
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1056186Z [command]/usr/bin/git log -1 --format=%H
+Check for Changesets	Run actions/checkout@v4	2025-12-09T06:43:35.1074691Z ada2ace609c8a9f13a091ac24a59bde5502f230b
+Check for Changesets	Setup Node.js	﻿2025-12-09T06:43:35.1271866Z ##[group]Run actions/setup-node@v4
+Check for Changesets	Setup Node.js	2025-12-09T06:43:35.1272222Z with:
+Check for Changesets	Setup Node.js	2025-12-09T06:43:35.1272448Z   node-version: 20.x
+Check for Changesets	Setup Node.js	2025-12-09T06:43:35.1272676Z   always-auth: false
+Check for Changesets	Setup Node.js	2025-12-09T06:43:35.1272910Z   check-latest: false
+Check for Changesets	Setup Node.js	2025-12-09T06:43:35.1273294Z   token: ***
+Check for Changesets	Setup Node.js	2025-12-09T06:43:35.1273520Z ##[endgroup]
+Check for Changesets	Setup Node.js	2025-12-09T06:43:35.2972962Z Found in cache @ /opt/hostedtoolcache/node/20.19.6/x64
+Check for Changesets	Setup Node.js	2025-12-09T06:43:35.2979808Z ##[group]Environment details
+Check for Changesets	Setup Node.js	2025-12-09T06:43:37.4449280Z node: v20.19.6
+Check for Changesets	Setup Node.js	2025-12-09T06:43:37.4449814Z npm: 10.8.2
+Check for Changesets	Setup Node.js	2025-12-09T06:43:37.4450130Z yarn: 1.22.22
+Check for Changesets	Setup Node.js	2025-12-09T06:43:37.4452610Z ##[endgroup]
+Check for Changesets	Install dependencies	﻿2025-12-09T06:43:37.4547532Z ##[group]Run npm install
+Check for Changesets	Install dependencies	2025-12-09T06:43:37.4547926Z [36;1mnpm install[0m
+Check for Changesets	Install dependencies	2025-12-09T06:43:37.4581813Z shell: /usr/bin/bash -e {0}
+Check for Changesets	Install dependencies	2025-12-09T06:43:37.4582160Z ##[endgroup]
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1108766Z 
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1116125Z > lino-arguments@0.2.4 prepare
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1116686Z > husky || true
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1116865Z 
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1530234Z 
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1531447Z added 234 packages, and audited 235 packages in 4s
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1531817Z 
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1532031Z 59 packages are looking for funding
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1532352Z   run `npm fund` for details
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1549980Z 
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1550673Z 1 moderate severity vulnerability
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1551040Z 
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1551284Z To address all issues, run:
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1551701Z   npm audit fix
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1551910Z 
+Check for Changesets	Install dependencies	2025-12-09T06:43:41.1552096Z Run `npm audit` for details.
+Check for Changesets	Check for changesets	﻿2025-12-09T06:43:41.1696669Z ##[group]Run # Skip changeset check for automated version PRs
+Check for Changesets	Check for changesets	2025-12-09T06:43:41.1697137Z [36;1m# Skip changeset check for automated version PRs[0m
+Check for Changesets	Check for changesets	2025-12-09T06:43:41.1697633Z [36;1mif [[ "issue-10-d4419a0e77c2" == "changeset-release/"* ]]; then[0m
+Check for Changesets	Check for changesets	2025-12-09T06:43:41.1698006Z [36;1m  echo "Skipping changeset check for automated release PR"[0m
+Check for Changesets	Check for changesets	2025-12-09T06:43:41.1698306Z [36;1m  exit 0[0m
+Check for Changesets	Check for changesets	2025-12-09T06:43:41.1698520Z [36;1mfi[0m
+Check for Changesets	Check for changesets	2025-12-09T06:43:41.1698694Z [36;1m[0m
+Check for Changesets	Check for changesets	2025-12-09T06:43:41.1698867Z [36;1m# Run validation script[0m
+Check for Changesets	Check for changesets	2025-12-09T06:43:41.1699116Z [36;1mnode scripts/validate-changeset.mjs[0m
+Check for Changesets	Check for changesets	2025-12-09T06:43:41.1717926Z shell: /usr/bin/bash -e {0}
+Check for Changesets	Check for changesets	2025-12-09T06:43:41.1718179Z ##[endgroup]
+Check for Changesets	Check for changesets	2025-12-09T06:43:41.2004582Z Found 0 changeset file(s)
+Check for Changesets	Check for changesets	2025-12-09T06:43:41.2033763Z ##[error]No changeset found. Please add a changeset by running 'npm run changeset' and commit the result.
+Check for Changesets	Check for changesets	2025-12-09T06:43:41.2044870Z ##[error]Process completed with exit code 1.
+Check for Changesets	Post Run actions/checkout@v4	﻿2025-12-09T06:43:41.2132978Z Post job cleanup.
+Check for Changesets	Post Run actions/checkout@v4	2025-12-09T06:43:41.3015411Z [command]/usr/bin/git version
+Check for Changesets	Post Run actions/checkout@v4	2025-12-09T06:43:41.3054928Z git version 2.52.0
+Check for Changesets	Post Run actions/checkout@v4	2025-12-09T06:43:41.3093600Z Temporarily overriding HOME='/home/runner/work/_temp/0126c187-7c10-465e-a9b7-0cb9c7f6208f' before making global git config changes
+Check for Changesets	Post Run actions/checkout@v4	2025-12-09T06:43:41.3094962Z Adding repository directory to the temporary git global config as a safe directory
+Check for Changesets	Post Run actions/checkout@v4	2025-12-09T06:43:41.3098485Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/lino-arguments/lino-arguments
+Check for Changesets	Post Run actions/checkout@v4	2025-12-09T06:43:41.3130892Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Check for Changesets	Post Run actions/checkout@v4	2025-12-09T06:43:41.3160325Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Check for Changesets	Post Run actions/checkout@v4	2025-12-09T06:43:41.3345288Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Check for Changesets	Post Run actions/checkout@v4	2025-12-09T06:43:41.3363406Z http.https://github.com/.extraheader
+Check for Changesets	Post Run actions/checkout@v4	2025-12-09T06:43:41.3374980Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+Check for Changesets	Post Run actions/checkout@v4	2025-12-09T06:43:41.3402548Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Check for Changesets	Post Run actions/checkout@v4	2025-12-09T06:43:41.3578916Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Check for Changesets	Post Run actions/checkout@v4	2025-12-09T06:43:41.3608324Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Check for Changesets	Complete job	﻿2025-12-09T06:43:41.3871117Z Cleaning up orphan processes
