@@ -204,8 +204,8 @@ Or the shorthand version:
 
 ## Files in This Case Study
 
-- `ci-logs/run-20054176340.log` - Full CI logs from the failing run
-- `ci-logs/run-20054499396.log` - Subsequent PR check run logs
+- `ci-logs/run-20054176340.txt` - Full CI logs from the failing run
+- `ci-logs/run-20054499396.txt` - Subsequent PR check run logs
 - `ci-runs-list.json` - List of recent CI runs
 - `npm-config-screenshot.png` - npm package settings showing trusted publisher config
 
