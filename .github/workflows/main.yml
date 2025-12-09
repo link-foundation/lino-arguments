@@ -221,8 +221,8 @@ jobs:
           # Pull the latest changes we just pushed
           git pull origin main
 
-          # Publish to npm using OIDC trusted publishing with provenance
-          npm run changeset:publish --provenance
+          # Publish to npm
+          npm run changeset:publish
 
           echo "published=true" >> $GITHUB_OUTPUT
 
@@ -230,6 +230,9 @@ jobs:
           PUBLISHED_VERSION=$(node -p "require('./package.json').version")
           echo "published_version=$PUBLISHED_VERSION" >> $GITHUB_OUTPUT
           echo "✅ Published lino-arguments@$PUBLISHED_VERSION to npm"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         if: steps.publish.outputs.published == 'true'
