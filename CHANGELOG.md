@@ -1,5 +1,11 @@
 # lino-arguments
 
+## 0.2.4
+
+### Patch Changes
+
+- b3cbcd4: Fix trusted publishing configuration for npm OIDC
+
 ## 0.2.3
 
 ### Patch Changes

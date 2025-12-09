@@ -1,6 +1,6 @@
 {
   "name": "lino-arguments",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "A setup of Links Notation Environment (lenv) + yargs to support easy configuration of CLI apps",
   "type": "module",
   "main": "./src/index.js",
