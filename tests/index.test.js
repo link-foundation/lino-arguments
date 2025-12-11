@@ -639,6 +639,167 @@ describe('makeConfig', () => {
       }
     });
   });
+
+  describe('Built-in Flag Conflicts (Issue #14)', () => {
+    it('should allow user-defined --version option', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('version', {
+                type: 'string',
+                description: 'Version to process',
+                default: '',
+              })
+              .option('repository', {
+                type: 'string',
+                description: 'Repository name',
+                default: '',
+              })
+              .strict(),
+          argv: [
+            'node',
+            'script.js',
+            '--version',
+            '0.8.36',
+            '--repository',
+            'link-foundation/test-anywhere',
+          ],
+        });
+
+        // Should parse --version as user-defined option, not yargs' built-in
+        assert.strictEqual(config.version, '0.8.36');
+        assert.strictEqual(config.repository, 'link-foundation/test-anywhere');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should allow user-defined --help option', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('help-text', {
+                type: 'string',
+                description: 'Help text to display',
+                default: '',
+              })
+              .strict(),
+          argv: ['node', 'script.js', '--help-text', 'Custom help message'],
+        });
+
+        // Should parse --help-text as user option
+        assert.strictEqual(config.helpText, 'Custom help message');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should work with --version in strict mode', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('version', {
+                type: 'string',
+                default: '',
+              })
+              .option('name', {
+                type: 'string',
+                default: '',
+              })
+              .strict(),
+          argv: ['node', 'script.js', '--version', '1.2.3', '--name', 'test'],
+        });
+
+        assert.strictEqual(config.version, '1.2.3');
+        assert.strictEqual(config.name, 'test');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should handle --version with boolean type', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs.option('version', {
+              type: 'boolean',
+              default: false,
+            }),
+          argv: ['node', 'script.js', '--version'],
+        });
+
+        assert.strictEqual(config.version, true);
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should allow users to explicitly enable help', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('port', {
+                type: 'number',
+                default: 3000,
+              })
+              .help(), // User explicitly enables help
+          argv: ['node', 'script.js', '--port', '8080'],
+        });
+
+        assert.strictEqual(config.port, 8080);
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should work with multiple custom options including version', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs, getenv }) =>
+            yargs
+              .option('version', {
+                type: 'string',
+                default: getenv('VERSION') || '',
+              })
+              .option('repository', {
+                type: 'string',
+                default: getenv('REPOSITORY') || '',
+              })
+              .option('release-id', {
+                type: 'string',
+                default: getenv('RELEASE_ID') || '',
+              })
+              .strict(),
+          argv: [
+            'node',
+            'script.js',
+            '--version',
+            'v0.8.36',
+            '--repository',
+            'test-repo',
+            '--release-id',
+            '12345',
+          ],
+        });
+
+        assert.strictEqual(config.version, 'v0.8.36');
+        assert.strictEqual(config.repository, 'test-repo');
+        assert.strictEqual(config.releaseId, '12345');
+      } finally {
+        cleanup();
+      }
+    });
+  });
 });
 
 // ============================================================================
