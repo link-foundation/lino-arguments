@@ -642,6 +642,150 @@ describe('makeConfig', () => {
 });
 
 // ============================================================================
+// Built-in Flag Conflict Tests (issue #13)
+// ============================================================================
+
+describe('Built-in Flag Conflicts', () => {
+  describe('Custom --version option', () => {
+    it('should allow custom --version option without conflict', () => {
+      const config = makeConfig({
+        yargs: ({ yargs }) =>
+          yargs.option('version', {
+            type: 'string',
+            default: '',
+            describe: 'Version number (e.g., 1.0.0)',
+          }),
+        argv: ['node', 'script.js', '--version', '1.0.0'],
+      });
+
+      // Should parse the custom --version option value, not trigger yargs' built-in version
+      assert.strictEqual(config.version, '1.0.0');
+      assert.strictEqual(typeof config.version, 'string');
+    });
+
+    it('should work with custom --version option without value', () => {
+      const config = makeConfig({
+        yargs: ({ yargs }) =>
+          yargs.option('version', {
+            type: 'string',
+            default: '0.0.0',
+            describe: 'Version number',
+          }),
+        argv: ['node', 'script.js'],
+      });
+
+      // Should use default value
+      assert.strictEqual(config.version, '0.0.0');
+    });
+
+    it('should parse --version from environment via getenv', () => {
+      const originalEnv = { ...process.env };
+      try {
+        process.env.VERSION = '2.0.0';
+
+        const config = makeConfig({
+          yargs: ({ yargs, getenv }) =>
+            yargs.option('version', {
+              type: 'string',
+              default: getenv('VERSION', ''),
+              describe: 'Version number',
+            }),
+          argv: ['node', 'script.js'],
+        });
+
+        assert.strictEqual(config.version, '2.0.0');
+      } finally {
+        process.env = { ...originalEnv };
+      }
+    });
+  });
+
+  describe('Custom --help option', () => {
+    it('should allow custom --help option without conflict', () => {
+      const config = makeConfig({
+        yargs: ({ yargs }) =>
+          yargs.option('help', {
+            type: 'string',
+            default: '',
+            describe: 'Help text or documentation URL',
+          }),
+        argv: ['node', 'script.js', '--help', 'https://docs.example.com'],
+      });
+
+      // Should parse the custom --help option value, not trigger yargs' built-in help
+      assert.strictEqual(config.help, 'https://docs.example.com');
+      assert.strictEqual(typeof config.help, 'string');
+    });
+
+    it('should work with custom --help option without value', () => {
+      const config = makeConfig({
+        yargs: ({ yargs }) =>
+          yargs.option('help', {
+            type: 'string',
+            default: 'default-help',
+            describe: 'Help text',
+          }),
+        argv: ['node', 'script.js'],
+      });
+
+      // Should use default value
+      assert.strictEqual(config.help, 'default-help');
+    });
+
+    it('should parse --help from environment via getenv', () => {
+      const originalEnv = { ...process.env };
+      try {
+        process.env.HELP = 'https://help.example.com';
+
+        const config = makeConfig({
+          yargs: ({ yargs, getenv }) =>
+            yargs.option('help', {
+              type: 'string',
+              default: getenv('HELP', ''),
+              describe: 'Help URL',
+            }),
+          argv: ['node', 'script.js'],
+        });
+
+        assert.strictEqual(config.help, 'https://help.example.com');
+      } finally {
+        process.env = { ...originalEnv };
+      }
+    });
+  });
+
+  describe('Both --version and --help custom options', () => {
+    it('should allow both custom --version and --help options simultaneously', () => {
+      const config = makeConfig({
+        yargs: ({ yargs }) =>
+          yargs
+            .option('version', {
+              type: 'string',
+              default: '',
+              describe: 'Version number',
+            })
+            .option('help', {
+              type: 'string',
+              default: '',
+              describe: 'Help URL',
+            }),
+        argv: [
+          'node',
+          'script.js',
+          '--version',
+          '3.0.0',
+          '--help',
+          'https://help.example.com',
+        ],
+      });
+
+      assert.strictEqual(config.version, '3.0.0');
+      assert.strictEqual(config.help, 'https://help.example.com');
+    });
+  });
+});
+
+// ============================================================================
 // Legacy API Tests (backwards compatibility)
 // ============================================================================
 
