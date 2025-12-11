@@ -357,11 +357,14 @@ export function makeConfig(config = {}) {
   }
 
   // Step 5: Configure yargs with user options + getenv helper
-  const yargsInstance = yargs(hideBin(argv)).option('configuration', {
-    type: 'string',
-    describe: 'Path to configuration .lenv file',
-    alias: 'c',
-  });
+  const yargsInstance = yargs(hideBin(argv))
+    .help(false) // Disable built-in help to allow custom --help option
+    .version(false) // Disable built-in version to allow custom --version option
+    .option('configuration', {
+      type: 'string',
+      describe: 'Path to configuration .lenv file',
+      alias: 'c',
+    });
 
   // Pass getenv helper if enabled
   const getenvHelper = getenvEnabled ? getenv : () => '';
