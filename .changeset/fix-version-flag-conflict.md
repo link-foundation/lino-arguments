@@ -5,6 +5,7 @@
 Fix makeConfig() parsing failure with user-defined --version and --help options
 
 **Problem**: When users defined their own `--version` or `--help` options in makeConfig(), yargs' built-in version and help flags would interfere with parsing, causing:
+
 - With `.strict()`: "Unknown argument" errors
 - Without `.strict()`: Options parsed as boolean `false` instead of the provided values
 
