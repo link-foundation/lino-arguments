@@ -71,6 +71,7 @@
 The `makeConfig` function uses a two-step parsing approach:
 
 1. **Initial Parse (lines 337-345)**: Parses CLI args to detect `--configuration` flag
+
    ```javascript
    const initialYargs = yargs(hideBin(argv))
      .option('configuration', { ... })
@@ -96,6 +97,7 @@ When yargs has built-in `--version` and `--help` flags enabled (default), these 
 3. **Cannot be used as custom options** without explicitly disabling built-in behavior
 
 From yargs documentation and GitHub issues:
+
 - "If the boolean argument `false` is provided to version, it will disable `--version`"
 - "Having an argument and option with the same name leads to conflicts"
 - Built-in flags have higher priority than user-defined options
@@ -103,19 +105,23 @@ From yargs documentation and GitHub issues:
 ### Evidence from Tests
 
 **Before Fix:**
+
 ```javascript
 config = makeConfig({
-  yargs: ({ yargs }) => yargs.option('version', { type: 'string', default: '' }),
-  argv: ['node', 'script.js', '--version', '1.0.0']
+  yargs: ({ yargs }) =>
+    yargs.option('version', { type: 'string', default: '' }),
+  argv: ['node', 'script.js', '--version', '1.0.0'],
 });
 console.log(config.version); // false (boolean from yargs built-in)
 ```
 
 **After Fix:**
+
 ```javascript
 config = makeConfig({
-  yargs: ({ yargs }) => yargs.option('version', { type: 'string', default: '' }),
-  argv: ['node', 'script.js', '--version', '1.0.0']
+  yargs: ({ yargs }) =>
+    yargs.option('version', { type: 'string', default: '' }),
+  argv: ['node', 'script.js', '--version', '1.0.0'],
 });
 console.log(config.version); // "1.0.0" (string from user input)
 ```
@@ -156,27 +162,33 @@ console.log(config.version); // "1.0.0" (string from user input)
 ### Alternative Solutions Considered
 
 #### Alternative 1: Conditional Disabling
+
 Check if user defined `--version` or `--help` options and only disable if needed.
 
 **Rejected because:**
+
 - Adds complexity
 - User might define options inside their yargs configuration function
 - Difficult to detect all cases
 - Not worth the added complexity
 
 #### Alternative 2: Document the Limitation
+
 Keep the bug and document that `--version` and `--help` cannot be used as option names.
 
 **Rejected because:**
+
 - Poor user experience
 - Unexpected behavior
 - Goes against principle of least surprise
 - Easy to fix with a simple change
 
 #### Alternative 3: Use Different Option Names
+
 Encourage users to use `--ver`, `--app-version`, etc. instead.
 
 **Rejected because:**
+
 - Workaround, not a real fix
 - Users expect `--version` to be available
 - Common convention in CLI tools
@@ -198,12 +210,14 @@ Added 7 new test cases in `tests/index.test.js`:
 ### Test Results
 
 **Before Fix:**
+
 ```
 ❌ BUG REPRODUCED: --version returned false instead of the value
 ❌ BUG REPRODUCED: --help returned boolean instead of string value
 ```
 
 **After Fix:**
+
 ```
 ✅ PASS: --version parsed correctly: 1.0.0
 ✅ PASS: --help parsed correctly: some-value
@@ -217,6 +231,7 @@ Added 7 new test cases in `tests/index.test.js`:
 ### Regression Testing
 
 All existing tests continue to pass:
+
 - Case conversion utilities: 23 tests ✅
 - getenv functionality: 6 tests ✅
 - makeConfig functionality: 18 tests ✅
@@ -228,11 +243,13 @@ All existing tests continue to pass:
 ### Affected Users
 
 **Before this fix:**
+
 - ❌ Any project using `--version` as a custom option (e.g., release scripts)
 - ❌ Any project using `--help` as a custom option (e.g., documentation URLs)
 - ❌ CI/CD pipelines that pass version numbers via CLI
 
 **After this fix:**
+
 - ✅ All custom options work as expected
 - ✅ No breaking changes for existing users
 - ✅ Better developer experience
@@ -240,15 +257,18 @@ All existing tests continue to pass:
 ### Real-World Impact
 
 **test-anywhere repository** (issues #116, #118):
+
 - Release scripts failed because `config.version` returned `false`
 - CI pipelines couldn't publish new versions
 - Forced to use workarounds like `--ver` instead
 
 **lino-arguments itself**:
+
 - Potential impact on any downstream projects
 - Reduces confidence in the library
 
 **General CLI Development**:
+
 - `--version` and `--help` are common CLI conventions
 - Users expect these to be available as option names
 - Bug prevented natural CLI design patterns
@@ -278,12 +298,14 @@ All existing tests continue to pass:
 ## References
 
 ### Issue Data
+
 - Issue #13: https://github.com/link-foundation/lino-arguments/issues/13
 - PR #16: https://github.com/link-foundation/lino-arguments/pull/16
 - test-anywhere issue #116: https://github.com/link-foundation/test-anywhere/issues/116
 - test-anywhere issue #118: https://github.com/link-foundation/test-anywhere/issues/118
 
 ### External Resources
+
 - yargs documentation: https://yargs.js.org/docs/
 - yargs issue #899: https://github.com/yargs/yargs/issues/899
 - yargs issue #929: https://github.com/yargs/yargs/issues/929
@@ -292,6 +314,7 @@ All existing tests continue to pass:
 - npm yargs package: https://www.npmjs.com/package/yargs
 
 ### Code Locations
+
 - Fix applied: `src/index.js:360-367`
 - Tests added: `tests/index.test.js:644-786`
 - Reproduction scripts: `experiments/minimal-repro-version.mjs`, `experiments/minimal-repro-help.mjs`
@@ -302,11 +325,13 @@ All existing tests continue to pass:
 This case study demonstrates a classic example of **inconsistent API usage** leading to unexpected behavior. The fix was simple (two additional method calls), but the impact was significant for users relying on standard CLI conventions.
 
 The bug was particularly insidious because:
+
 1. It only affected specific option names (`--version`, `--help`)
 2. The error was silent (no exception thrown, just wrong value)
 3. The initial parse worked correctly, creating false confidence
 
 The comprehensive testing and case study approach requested by the maintainer helped ensure:
+
 1. Complete understanding of the root cause
 2. Validation that the fix works correctly
 3. Documentation for future reference
