@@ -1,5 +1,4 @@
-import { describe, it } from 'node:test';
-import assert from 'node:assert';
+import { describe, it, expect } from 'test-anywhere';
 import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -20,114 +19,114 @@ import {
 describe('Case Conversion Utilities', () => {
   describe('toUpperCase', () => {
     it('should convert camelCase to UPPER_CASE', () => {
-      assert.strictEqual(toUpperCase('apiKey'), 'API_KEY');
-      assert.strictEqual(toUpperCase('myVariableName'), 'MY_VARIABLE_NAME');
+      expect(toUpperCase('apiKey')).toBe('API_KEY');
+      expect(toUpperCase('myVariableName')).toBe('MY_VARIABLE_NAME');
     });
 
     it('should convert kebab-case to UPPER_CASE', () => {
-      assert.strictEqual(toUpperCase('api-key'), 'API_KEY');
-      assert.strictEqual(toUpperCase('my-variable-name'), 'MY_VARIABLE_NAME');
+      expect(toUpperCase('api-key')).toBe('API_KEY');
+      expect(toUpperCase('my-variable-name')).toBe('MY_VARIABLE_NAME');
     });
 
     it('should convert snake_case to UPPER_CASE', () => {
-      assert.strictEqual(toUpperCase('api_key'), 'API_KEY');
-      assert.strictEqual(toUpperCase('my_variable_name'), 'MY_VARIABLE_NAME');
+      expect(toUpperCase('api_key')).toBe('API_KEY');
+      expect(toUpperCase('my_variable_name')).toBe('MY_VARIABLE_NAME');
     });
 
     it('should convert PascalCase to UPPER_CASE', () => {
-      assert.strictEqual(toUpperCase('ApiKey'), 'API_KEY');
-      assert.strictEqual(toUpperCase('MyVariableName'), 'MY_VARIABLE_NAME');
+      expect(toUpperCase('ApiKey')).toBe('API_KEY');
+      expect(toUpperCase('MyVariableName')).toBe('MY_VARIABLE_NAME');
     });
 
     it('should handle already UPPER_CASE', () => {
-      assert.strictEqual(toUpperCase('API_KEY'), 'API_KEY');
+      expect(toUpperCase('API_KEY')).toBe('API_KEY');
     });
   });
 
   describe('toCamelCase', () => {
     it('should convert kebab-case to camelCase', () => {
-      assert.strictEqual(toCamelCase('api-key'), 'apiKey');
-      assert.strictEqual(toCamelCase('my-variable-name'), 'myVariableName');
+      expect(toCamelCase('api-key')).toBe('apiKey');
+      expect(toCamelCase('my-variable-name')).toBe('myVariableName');
     });
 
     it('should convert UPPER_CASE to camelCase', () => {
-      assert.strictEqual(toCamelCase('API_KEY'), 'apiKey');
-      assert.strictEqual(toCamelCase('MY_VARIABLE_NAME'), 'myVariableName');
+      expect(toCamelCase('API_KEY')).toBe('apiKey');
+      expect(toCamelCase('MY_VARIABLE_NAME')).toBe('myVariableName');
     });
 
     it('should convert snake_case to camelCase', () => {
-      assert.strictEqual(toCamelCase('api_key'), 'apiKey');
-      assert.strictEqual(toCamelCase('my_variable_name'), 'myVariableName');
+      expect(toCamelCase('api_key')).toBe('apiKey');
+      expect(toCamelCase('my_variable_name')).toBe('myVariableName');
     });
 
     it('should convert PascalCase to camelCase', () => {
-      assert.strictEqual(toCamelCase('ApiKey'), 'apikey');
-      assert.strictEqual(toCamelCase('MyVariableName'), 'myvariablename');
+      expect(toCamelCase('ApiKey')).toBe('apikey');
+      expect(toCamelCase('MyVariableName')).toBe('myvariablename');
     });
 
     it('should handle already camelCase', () => {
-      assert.strictEqual(toCamelCase('apiKey'), 'apikey');
+      expect(toCamelCase('apiKey')).toBe('apikey');
     });
   });
 
   describe('toKebabCase', () => {
     it('should convert camelCase to kebab-case', () => {
-      assert.strictEqual(toKebabCase('apiKey'), 'api-key');
-      assert.strictEqual(toKebabCase('myVariableName'), 'my-variable-name');
+      expect(toKebabCase('apiKey')).toBe('api-key');
+      expect(toKebabCase('myVariableName')).toBe('my-variable-name');
     });
 
     it('should convert UPPER_CASE to kebab-case', () => {
-      assert.strictEqual(toKebabCase('API_KEY'), 'api-key');
-      assert.strictEqual(toKebabCase('MY_VARIABLE_NAME'), 'my-variable-name');
+      expect(toKebabCase('API_KEY')).toBe('api-key');
+      expect(toKebabCase('MY_VARIABLE_NAME')).toBe('my-variable-name');
     });
 
     it('should convert PascalCase to kebab-case', () => {
-      assert.strictEqual(toKebabCase('ApiKey'), 'api-key');
-      assert.strictEqual(toKebabCase('MyVariableName'), 'my-variable-name');
+      expect(toKebabCase('ApiKey')).toBe('api-key');
+      expect(toKebabCase('MyVariableName')).toBe('my-variable-name');
     });
 
     it('should handle already kebab-case', () => {
-      assert.strictEqual(toKebabCase('api-key'), 'api-key');
+      expect(toKebabCase('api-key')).toBe('api-key');
     });
   });
 
   describe('toSnakeCase', () => {
     it('should convert camelCase to snake_case', () => {
-      assert.strictEqual(toSnakeCase('apiKey'), 'api_key');
-      assert.strictEqual(toSnakeCase('myVariableName'), 'my_variable_name');
+      expect(toSnakeCase('apiKey')).toBe('api_key');
+      expect(toSnakeCase('myVariableName')).toBe('my_variable_name');
     });
 
     it('should convert kebab-case to snake_case', () => {
-      assert.strictEqual(toSnakeCase('api-key'), 'api_key');
-      assert.strictEqual(toSnakeCase('my-variable-name'), 'my_variable_name');
+      expect(toSnakeCase('api-key')).toBe('api_key');
+      expect(toSnakeCase('my-variable-name')).toBe('my_variable_name');
     });
 
     it('should convert UPPER_CASE to snake_case', () => {
-      assert.strictEqual(toSnakeCase('API_KEY'), 'api_key');
+      expect(toSnakeCase('API_KEY')).toBe('api_key');
     });
 
     it('should handle already snake_case', () => {
-      assert.strictEqual(toSnakeCase('api_key'), 'api_key');
+      expect(toSnakeCase('api_key')).toBe('api_key');
     });
   });
 
   describe('toPascalCase', () => {
     it('should convert camelCase to PascalCase', () => {
-      assert.strictEqual(toPascalCase('apiKey'), 'Apikey');
+      expect(toPascalCase('apiKey')).toBe('Apikey');
     });
 
     it('should convert kebab-case to PascalCase', () => {
-      assert.strictEqual(toPascalCase('api-key'), 'ApiKey');
-      assert.strictEqual(toPascalCase('my-variable-name'), 'MyVariableName');
+      expect(toPascalCase('api-key')).toBe('ApiKey');
+      expect(toPascalCase('my-variable-name')).toBe('MyVariableName');
     });
 
     it('should convert snake_case to PascalCase', () => {
-      assert.strictEqual(toPascalCase('api_key'), 'ApiKey');
-      assert.strictEqual(toPascalCase('my_variable_name'), 'MyVariableName');
+      expect(toPascalCase('api_key')).toBe('ApiKey');
+      expect(toPascalCase('my_variable_name')).toBe('MyVariableName');
     });
 
     it('should handle already PascalCase', () => {
-      assert.strictEqual(toPascalCase('ApiKey'), 'Apikey');
+      expect(toPascalCase('ApiKey')).toBe('Apikey');
     });
   });
 });
@@ -157,9 +156,9 @@ describe('getenv', () => {
     cleanupTestVars();
     try {
       process.env.TEST_VAR = 'value';
-      assert.strictEqual(getenv('testVar'), 'value');
-      assert.strictEqual(getenv('test-var'), 'value');
-      assert.strictEqual(getenv('TEST_VAR'), 'value');
+      expect(getenv('testVar')).toBe('value');
+      expect(getenv('test-var')).toBe('value');
+      expect(getenv('TEST_VAR')).toBe('value');
     } finally {
       restoreEnv();
     }
@@ -169,8 +168,8 @@ describe('getenv', () => {
     cleanupTestVars();
     try {
       process.env.testVar = 'value';
-      assert.strictEqual(getenv('TEST_VAR'), 'value');
-      assert.strictEqual(getenv('test-var'), 'value');
+      expect(getenv('TEST_VAR')).toBe('value');
+      expect(getenv('test-var')).toBe('value');
     } finally {
       restoreEnv();
     }
@@ -180,7 +179,7 @@ describe('getenv', () => {
     cleanupTestVars();
     try {
       process.env['test-var'] = 'value';
-      assert.strictEqual(getenv('testVar'), 'value');
+      expect(getenv('testVar')).toBe('value');
     } finally {
       restoreEnv();
     }
@@ -189,7 +188,7 @@ describe('getenv', () => {
   it('should return default value when not found', () => {
     cleanupTestVars();
     try {
-      assert.strictEqual(getenv('NON_EXISTENT', 'default'), 'default');
+      expect(getenv('NON_EXISTENT', 'default')).toBe('default');
     } finally {
       restoreEnv();
     }
@@ -198,7 +197,7 @@ describe('getenv', () => {
   it('should return empty string as default when not specified', () => {
     cleanupTestVars();
     try {
-      assert.strictEqual(getenv('NON_EXISTENT'), '');
+      expect(getenv('NON_EXISTENT')).toBe('');
     } finally {
       restoreEnv();
     }
@@ -209,7 +208,7 @@ describe('getenv', () => {
     try {
       process.env.myKey = 'original';
       process.env.MY_KEY = 'upper';
-      assert.strictEqual(getenv('myKey'), 'original');
+      expect(getenv('myKey')).toBe('original');
     } finally {
       restoreEnv();
     }
@@ -263,8 +262,8 @@ describe('makeConfig', () => {
           argv: ['node', 'script.js'],
         });
 
-        assert.strictEqual(config.port, 3000);
-        assert.strictEqual(config.verbose, false);
+        expect(config.port).toBe(3000);
+        expect(config.verbose).toBe(false);
       } finally {
         cleanup();
       }
@@ -281,8 +280,8 @@ describe('makeConfig', () => {
           argv: ['node', 'script.js', '--port', '8080', '--verbose'],
         });
 
-        assert.strictEqual(config.port, 8080);
-        assert.strictEqual(config.verbose, true);
+        expect(config.port).toBe(8080);
+        expect(config.verbose).toBe(true);
       } finally {
         cleanup();
       }
@@ -297,8 +296,8 @@ describe('makeConfig', () => {
           argv: ['node', 'script.js'],
         });
 
-        assert.strictEqual(config.apiKey, 'key123');
-        assert.strictEqual(config['api-key'], undefined);
+        expect(config.apiKey).toBe('key123');
+        expect(config['api-key']).toBe(undefined);
       } finally {
         cleanup();
       }
@@ -321,8 +320,8 @@ describe('makeConfig', () => {
           argv: ['node', 'script.js'],
         });
 
-        assert.strictEqual(config.port, 5000);
-        assert.strictEqual(process.env.APP_PORT, '5000');
+        expect(config.port).toBe(5000);
+        expect(process.env.APP_PORT).toBe('5000');
       } finally {
         cleanup();
       }
@@ -345,8 +344,8 @@ describe('makeConfig', () => {
         });
 
         // --configuration should override default .lenv
-        assert.strictEqual(config.port, 9000);
-        assert.strictEqual(process.env.APP_PORT, '9000');
+        expect(config.port).toBe(9000);
+        expect(process.env.APP_PORT).toBe('9000');
       } finally {
         cleanup();
       }
@@ -368,7 +367,7 @@ describe('makeConfig', () => {
         });
 
         // CLI should have highest priority
-        assert.strictEqual(config.port, 7000);
+        expect(config.port).toBe(7000);
       } finally {
         cleanup();
       }
@@ -387,7 +386,7 @@ describe('makeConfig', () => {
           argv: ['node', 'script.js'],
         });
 
-        assert.strictEqual(config.port, 3000);
+        expect(config.port).toBe(3000);
       } finally {
         cleanup();
       }
@@ -409,9 +408,9 @@ describe('makeConfig', () => {
           argv: ['node', 'script.js'],
         });
 
-        assert.strictEqual(process.env.API_KEY, 'key123');
-        assert.strictEqual(process.env.MY_PORT, '3000');
-        assert.strictEqual(process.env.MY_HOST, 'localhost');
+        expect(process.env.API_KEY).toBe('key123');
+        expect(process.env.MY_PORT).toBe('3000');
+        expect(process.env.MY_HOST).toBe('localhost');
       } finally {
         cleanup();
       }
@@ -437,9 +436,9 @@ describe('makeConfig', () => {
         });
 
         // getenv should find API_KEY when asked for apiKey
-        assert.strictEqual(config.apiKey, 'secret');
+        expect(config.apiKey).toBe('secret');
         // Non-existent should use default
-        assert.strictEqual(config.anotherKey, 'default');
+        expect(config.anotherKey).toBe('default');
       } finally {
         cleanup();
       }
@@ -463,8 +462,8 @@ describe('makeConfig', () => {
         });
 
         // Should not load from .lenv
-        assert.strictEqual(config.port, 3000);
-        assert.strictEqual(process.env.APP_PORT, undefined);
+        expect(config.port).toBe(3000);
+        expect(process.env.APP_PORT).toBe(undefined);
       } finally {
         cleanup();
       }
@@ -481,7 +480,7 @@ describe('makeConfig', () => {
           argv: ['node', 'script.js'],
         });
 
-        assert.strictEqual(config.test, false);
+        expect(config.test).toBe(false);
       } finally {
         cleanup();
       }
@@ -503,7 +502,7 @@ describe('makeConfig', () => {
           argv: ['node', 'script.js'],
         });
 
-        assert.strictEqual(config.port, 3000);
+        expect(config.port).toBe(3000);
       } finally {
         cleanup();
       }
@@ -523,7 +522,7 @@ describe('makeConfig', () => {
           argv: ['node', 'script.js', '-c', testConfigFile],
         });
 
-        assert.strictEqual(config.port, 9000);
+        expect(config.port).toBe(9000);
       } finally {
         cleanup();
       }
@@ -566,9 +565,9 @@ describe('makeConfig', () => {
           argv: ['node', 'script.js'],
         });
 
-        assert.strictEqual(config.port, 3000);
-        assert.strictEqual(config.host, 'localhost');
-        assert.strictEqual(config.name, 'base');
+        expect(config.port).toBe(3000);
+        expect(config.host).toBe('localhost');
+        expect(config.name).toBe('base');
 
         // Clean env for next test
         delete process.env.APP_PORT;
@@ -595,9 +594,9 @@ describe('makeConfig', () => {
           argv: ['node', 'script.js', '--configuration', testConfigFile],
         });
 
-        assert.strictEqual(config.port, 5000); // from --configuration
-        assert.strictEqual(config.host, 'override-host'); // from --configuration
-        assert.strictEqual(config.name, 'base'); // from .lenv (not in --configuration)
+        expect(config.port).toBe(5000); // from --configuration
+        expect(config.host).toBe('override-host'); // from --configuration
+        expect(config.name).toBe('base'); // from .lenv (not in --configuration)
 
         // Clean env for next test
         delete process.env.APP_PORT;
@@ -631,9 +630,9 @@ describe('makeConfig', () => {
           ],
         });
 
-        assert.strictEqual(config.port, 9000); // from CLI (highest priority)
-        assert.strictEqual(config.host, 'override-host'); // from --configuration
-        assert.strictEqual(config.name, 'base'); // from .lenv
+        expect(config.port).toBe(9000); // from CLI (highest priority)
+        expect(config.host).toBe('override-host'); // from --configuration
+        expect(config.name).toBe('base'); // from .lenv
       } finally {
         cleanup();
       }
@@ -649,34 +648,34 @@ describe('parseLinoArguments (legacy)', () => {
   it('should parse simple links notation format', () => {
     const input = '(\n  --verbose\n  --port 3000\n)';
     const result = parseLinoArguments(input);
-    assert.ok(result.includes('--verbose'));
-    assert.ok(result.includes('--port'));
-    assert.ok(result.includes('3000'));
+    expect(result.includes('--verbose')).toBeTruthy();
+    expect(result.includes('--port')).toBeTruthy();
+    expect(result.includes('3000')).toBeTruthy();
   });
 
   it('should parse arguments without parentheses', () => {
     const input = '--debug\n--host localhost';
     const result = parseLinoArguments(input);
-    assert.ok(result.includes('--debug'));
-    assert.ok(result.includes('--host'));
-    assert.ok(result.includes('localhost'));
+    expect(result.includes('--debug')).toBeTruthy();
+    expect(result.includes('--host')).toBeTruthy();
+    expect(result.includes('localhost')).toBeTruthy();
   });
 
   it('should handle empty input', () => {
     const result = parseLinoArguments('');
-    assert.deepStrictEqual(result, []);
+    expect(result).toEqual([]);
   });
 
   it('should handle null input', () => {
     const result = parseLinoArguments(null);
-    assert.deepStrictEqual(result, []);
+    expect(result).toEqual([]);
   });
 
   it('should filter out comments', () => {
     const input = '# Comment\n--verbose\n# Another comment\n--debug';
     const result = parseLinoArguments(input);
-    assert.ok(!result.some((arg) => arg.startsWith('#')));
-    assert.ok(result.includes('--verbose'));
-    assert.ok(result.includes('--debug'));
+    expect(!result.some((arg) => arg.startsWith('#'))).toBeTruthy();
+    expect(result.includes('--verbose')).toBeTruthy();
+    expect(result.includes('--debug')).toBeTruthy();
   });
 });
