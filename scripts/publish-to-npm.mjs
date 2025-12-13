@@ -101,7 +101,7 @@ async function main() {
         setOutput('published_version', currentVersion);
         console.log(`\u2705 Published test-anywhere@${currentVersion} to npm`);
         return;
-      } catch (_error) {
+      } catch {
         if (i < MAX_RETRIES) {
           console.log(
             `Publish failed, waiting ${RETRY_DELAY / 1000}s before retry...`

@@ -118,21 +118,41 @@ jobs:
         if: matrix.runtime == 'node'
         run: npm test
 
+      - name: Setup Node.js (for npm install)
+        if: matrix.runtime == 'bun'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
       - name: Setup Bun
         if: matrix.runtime == 'bun'
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
+      - name: Install dependencies (Bun)
+        if: matrix.runtime == 'bun'
+        run: npm install
+
       - name: Run tests (Bun)
         if: matrix.runtime == 'bun'
         run: bun test
+
+      - name: Setup Node.js (for npm install)
+        if: matrix.runtime == 'deno'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
 
       - name: Setup Deno
         if: matrix.runtime == 'deno'
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+
+      - name: Install dependencies (Deno)
+        if: matrix.runtime == 'deno'
+        run: npm install
 
       - name: Run tests (Deno)
         if: matrix.runtime == 'deno'

@@ -1,4 +1,4 @@
-import { describe, it, expect, assert } from 'test-anywhere';
+import { describe, it, expect } from 'test-anywhere';
 import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
