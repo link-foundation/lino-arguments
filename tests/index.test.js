@@ -668,8 +668,8 @@ describe('makeConfig', () => {
         });
 
         // Should parse --version as user-defined option, not yargs' built-in
-        assert.strictEqual(config.version, '0.8.36');
-        assert.strictEqual(config.repository, 'link-foundation/test-anywhere');
+        expect(config.version).toBe('0.8.36');
+        expect(config.repository).toBe('link-foundation/test-anywhere');
       } finally {
         cleanup();
       }
@@ -691,7 +691,7 @@ describe('makeConfig', () => {
         });
 
         // Should parse --help-text as user option
-        assert.strictEqual(config.helpText, 'Custom help message');
+        expect(config.helpText).toBe('Custom help message');
       } finally {
         cleanup();
       }
@@ -715,8 +715,8 @@ describe('makeConfig', () => {
           argv: ['node', 'script.js', '--version', '1.2.3', '--name', 'test'],
         });
 
-        assert.strictEqual(config.version, '1.2.3');
-        assert.strictEqual(config.name, 'test');
+        expect(config.version).toBe('1.2.3');
+        expect(config.name).toBe('test');
       } finally {
         cleanup();
       }
@@ -734,7 +734,7 @@ describe('makeConfig', () => {
           argv: ['node', 'script.js', '--version'],
         });
 
-        assert.strictEqual(config.version, true);
+        expect(config.version).toBe(true);
       } finally {
         cleanup();
       }
@@ -754,7 +754,7 @@ describe('makeConfig', () => {
           argv: ['node', 'script.js', '--port', '8080'],
         });
 
-        assert.strictEqual(config.port, 8080);
+        expect(config.port).toBe(8080);
       } finally {
         cleanup();
       }
@@ -791,9 +791,9 @@ describe('makeConfig', () => {
           ],
         });
 
-        assert.strictEqual(config.version, 'v0.8.36');
-        assert.strictEqual(config.repository, 'test-repo');
-        assert.strictEqual(config.releaseId, '12345');
+        expect(config.version).toBe('v0.8.36');
+        expect(config.repository).toBe('test-repo');
+        expect(config.releaseId).toBe('12345');
       } finally {
         cleanup();
       }
@@ -820,8 +820,8 @@ describe('makeConfig', () => {
         });
 
         // Config should be parsed correctly
-        assert.strictEqual(config.port, 8080);
-        assert.strictEqual(config.host, 'localhost');
+        expect(config.port).toBe(8080);
+        expect(config.host).toBe('localhost');
       } finally {
         cleanup();
       }
@@ -847,8 +847,8 @@ describe('makeConfig', () => {
         });
 
         // Config should be parsed correctly
-        assert.strictEqual(config.debug, true);
-        assert.strictEqual(config.verbose, true);
+        expect(config.debug).toBe(true);
+        expect(config.verbose).toBe(true);
       } finally {
         cleanup();
       }
@@ -870,7 +870,7 @@ describe('makeConfig', () => {
         });
 
         // Config should be parsed correctly
-        assert.strictEqual(config.config, './custom.json');
+        expect(config.config).toBe('./custom.json');
       } finally {
         cleanup();
       }
@@ -892,7 +892,7 @@ describe('makeConfig', () => {
         });
 
         // Config should be parsed correctly
-        assert.strictEqual(config.port, 9000);
+        expect(config.port).toBe(9000);
       } finally {
         cleanup();
       }
@@ -927,8 +927,8 @@ describe('makeConfig', () => {
         });
 
         // All custom options should be parsed correctly
-        assert.strictEqual(config.output, './results');
-        assert.strictEqual(config.format, 'xml');
+        expect(config.output).toBe('./results');
+        expect(config.format).toBe('xml');
       } finally {
         cleanup();
       }
