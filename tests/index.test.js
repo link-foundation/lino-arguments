@@ -800,6 +800,141 @@ describe('makeConfig', () => {
       }
     });
   });
+
+  describe('Explicitly Enabling Built-in Version and Help', () => {
+    it('should allow explicitly enabling built-in --version', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('port', {
+                type: 'number',
+                default: 3000,
+              })
+              .option('host', {
+                type: 'string',
+                default: 'localhost',
+              })
+              .version('1.0.0'), // Explicitly enable built-in version
+          argv: ['node', 'script.js', '--port', '8080'],
+        });
+
+        // Config should be parsed correctly
+        assert.strictEqual(config.port, 8080);
+        assert.strictEqual(config.host, 'localhost');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should allow explicitly enabling both --version and --help', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('debug', {
+                type: 'boolean',
+                default: false,
+              })
+              .option('verbose', {
+                type: 'boolean',
+                default: false,
+              })
+              .version('2.5.0') // Enable version
+              .help(), // Enable help
+          argv: ['node', 'script.js', '--debug', '--verbose'],
+        });
+
+        // Config should be parsed correctly
+        assert.strictEqual(config.debug, true);
+        assert.strictEqual(config.verbose, true);
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should allow version with alias', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('config', {
+                type: 'string',
+                default: './config.json',
+              })
+              .version('3.0.0')
+              .alias('version', 'v'), // Add -v alias
+          argv: ['node', 'script.js', '--config', './custom.json'],
+        });
+
+        // Config should be parsed correctly
+        assert.strictEqual(config.config, './custom.json');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should allow help with alias', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('port', {
+                type: 'number',
+                default: 3000,
+              })
+              .help()
+              .alias('help', 'h'), // Add -h alias
+          argv: ['node', 'script.js', '--port', '9000'],
+        });
+
+        // Config should be parsed correctly
+        assert.strictEqual(config.port, 9000);
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should work with both built-in version/help and custom options', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('output', {
+                type: 'string',
+                description: 'Output directory',
+                default: './output',
+              })
+              .option('format', {
+                type: 'string',
+                description: 'Output format',
+                default: 'json',
+              })
+              .version('1.2.3')
+              .help(),
+          argv: [
+            'node',
+            'script.js',
+            '--output',
+            './results',
+            '--format',
+            'xml',
+          ],
+        });
+
+        // All custom options should be parsed correctly
+        assert.strictEqual(config.output, './results');
+        assert.strictEqual(config.format, 'xml');
+      } finally {
+        cleanup();
+      }
+    });
+  });
 });
 
 // ============================================================================
