@@ -23,6 +23,10 @@ export default [
         // Runtime-specific globals
         Bun: 'readonly',
         Deno: 'readonly',
+        // Test globals (Node.js test runner)
+        describe: 'readonly',
+        it: 'readonly',
+        assert: 'readonly',
       },
     },
     rules: {
