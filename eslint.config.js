@@ -20,6 +20,7 @@ export default [
         Buffer: 'readonly',
         __dirname: 'readonly',
         __filename: 'readonly',
+        fetch: 'readonly', // Node.js 18+ and modern runtimes
         // Runtime-specific globals
         Bun: 'readonly',
         Deno: 'readonly',
