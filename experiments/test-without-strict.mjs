@@ -12,6 +12,7 @@ console.log('');
 
 console.log('=== Testing WITHOUT .strict() ===');
 const config = makeConfig({
+  builtins: { version: false, help: false }, // Disable built-in flags to allow custom --version
   yargs: ({ yargs, getenv }) =>
     yargs
       .option('version', {
@@ -23,8 +24,7 @@ const config = makeConfig({
         type: 'string',
         description: 'Repository name',
         default: getenv('REPOSITORY') || '',
-      })
-      .help(),
+      }),
   // NO .strict() here
 });
 

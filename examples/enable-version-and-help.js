@@ -1,16 +1,15 @@
 import { makeConfig } from '../src/index.js';
 
 /**
- * Example demonstrating how to explicitly enable yargs' built-in
- * --version and --help flags in makeConfig()
+ * Example demonstrating how to work with yargs' built-in --version and --help flags
  *
- * By default, makeConfig() disables these built-in flags to allow users
- * to define their own --version and --help options. However, if you want
- * to use yargs' built-in version and help functionality, you can explicitly
- * enable them as shown below.
+ * By default, makeConfig() enables yargs' built-in version and help flags
+ * for backwards compatibility. However, if you want to define your own
+ * --version or --help options, you can disable the built-in flags using
+ * the `builtins` configuration option.
  */
 
-console.log('=== Enabling Built-in Version and Help Flags ===\n');
+console.log('=== Working with Built-in Version and Help Flags ===\n');
 
 // Example 1: Enable built-in --version flag
 console.log('1. Enabling built-in --version flag:');
@@ -93,37 +92,48 @@ console.log('Config:', configWithPackageVersion);
 console.log('Config file:', configWithPackageVersion.config);
 console.log();
 
-// Example 4: Important note about user-defined options
-console.log('4. Why makeConfig() disables these flags by default:');
-console.log(`
-Without disabling built-in flags, user-defined --version options would conflict:
-
-// This would FAIL if we didn't disable built-in flags:
-const config = makeConfig({
+// Example 4: Using custom --version option (disable built-in)
+console.log('4. Disabling built-in flags to use custom --version:');
+const configWithCustomVersion = makeConfig({
+  builtins: { version: false, help: false }, // Disable built-in flags
   yargs: ({ yargs }) =>
     yargs
       .option('version', {
         type: 'string',
         description: 'Release version to process',
+        default: '',
+      })
+      .option('repository', {
+        type: 'string',
+        description: 'Repository name',
+        default: '',
       })
       .strict(),
-  argv: ['node', 'script.js', '--version', '0.8.36']
+  argv: [
+    'node',
+    'script.js',
+    '--version',
+    '0.8.36',
+    '--repository',
+    'test-repo',
+  ],
 });
 
-// Error: Unknown argument: 0.8.36
-// Because yargs' built-in --version would intercept the flag
-
-To use built-in flags, explicitly enable them as shown in examples above.
-To use custom --version or --help options, don't call .version() or .help().
-`);
+console.log('Config:', configWithCustomVersion);
+console.log('Version:', configWithCustomVersion.version);
+console.log('Repository:', configWithCustomVersion.repository);
+console.log();
 
 console.log('\n=== Summary ===');
 console.log(
-  '✅ Built-in --version and --help are disabled by default in makeConfig()'
+  '✅ Built-in --version and --help are ENABLED by default (backwards compatible)'
 );
 console.log(
-  '✅ Explicitly call .version() and .help() to enable them when needed'
+  '✅ Explicitly call .version() and .help() in yargs config to set version string'
 );
 console.log(
-  '✅ This gives you full control over your CLI interface without conflicts'
+  '✅ To use custom --version or --help options, set builtins: { version: false, help: false }'
+);
+console.log(
+  '✅ This gives you full control over your CLI interface without breaking changes'
 );

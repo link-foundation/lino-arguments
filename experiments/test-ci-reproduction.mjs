@@ -20,6 +20,7 @@ console.log('');
 // Configure CLI arguments using lino-arguments
 console.log('=== Calling makeConfig() ===');
 const config = makeConfig({
+  builtins: { version: false, help: false }, // Disable built-in flags to allow custom --version
   yargs: ({ yargs, getenv }) =>
     yargs
       .option('version', {
@@ -32,7 +33,6 @@ const config = makeConfig({
         description: 'Repository name',
         default: getenv('REPOSITORY') || '',
       })
-      .help()
       .strict(),
 });
 

@@ -644,6 +644,7 @@ describe('makeConfig', () => {
       cleanupTestEnv();
       try {
         const config = makeConfig({
+          builtins: { version: false, help: false }, // Disable built-in flags to allow user-defined options
           yargs: ({ yargs }) =>
             yargs
               .option('version', {
@@ -701,6 +702,7 @@ describe('makeConfig', () => {
       cleanupTestEnv();
       try {
         const config = makeConfig({
+          builtins: { version: false }, // Disable built-in version to allow user-defined
           yargs: ({ yargs }) =>
             yargs
               .option('version', {
@@ -726,6 +728,7 @@ describe('makeConfig', () => {
       cleanupTestEnv();
       try {
         const config = makeConfig({
+          builtins: { version: false }, // Disable built-in version to allow user-defined
           yargs: ({ yargs }) =>
             yargs.option('version', {
               type: 'boolean',
@@ -764,6 +767,7 @@ describe('makeConfig', () => {
       cleanupTestEnv();
       try {
         const config = makeConfig({
+          builtins: { version: false }, // Disable built-in version to allow user-defined
           yargs: ({ yargs, getenv }) =>
             yargs
               .option('version', {

@@ -282,6 +282,9 @@ async function loadDotenvx(options = {}) {
  * @param {boolean} [config.env.enabled=false] - Enable .env loading
  * @param {Object} [config.getenv] - Getenv configuration
  * @param {boolean} [config.getenv.enabled=true] - Enable getenv helper
+ * @param {Object} [config.builtins] - Built-in yargs flags configuration
+ * @param {boolean} [config.builtins.version=true] - Enable yargs built-in --version flag
+ * @param {boolean} [config.builtins.help=true] - Enable yargs built-in --help flag
  * @param {string[]} [config.argv] - Custom argv to parse (default: process.argv)
  * @returns {Object} Parsed configuration object with camelCase keys
  *
@@ -303,6 +306,15 @@ async function loadDotenvx(options = {}) {
  *     .option('api-key', { type: 'string', default: getenv('API_KEY', '') })
  *     .option('port', { type: 'number', default: getenv('PORT', 3000) })
  * });
+ *
+ * @example
+ * // Disable built-in flags to use custom --version or --help options
+ * const config = makeConfig({
+ *   builtins: { version: false, help: false },
+ *   yargs: ({ yargs, getenv }) => yargs
+ *     .option('version', { type: 'string', description: 'Release version' })
+ *     .option('help', { type: 'boolean', description: 'Show custom help' })
+ * });
  */
 export function makeConfig(config = {}) {
   const {
@@ -310,6 +322,7 @@ export function makeConfig(config = {}) {
     lenv = {},
     env = {},
     getenv: getenvConfig = {},
+    builtins = {},
     argv = process.argv,
   } = config;
 
@@ -322,6 +335,9 @@ export function makeConfig(config = {}) {
   const envQuiet = env.quiet !== false; // Default: true
 
   const getenvEnabled = getenvConfig.enabled !== false; // Default: true
+
+  const builtinVersion = builtins.version !== false; // Default: true (backwards compatible)
+  const builtinHelp = builtins.help !== false; // Default: true (backwards compatible)
 
   // Step 1: Load dotenvx/.env (DEPRECATED, lowest priority)
   if (envEnabled) {
@@ -363,8 +379,8 @@ export function makeConfig(config = {}) {
       describe: 'Path to configuration .lenv file',
       alias: 'c',
     })
-    .version(false) // Disable built-in version flag to allow user-defined --version
-    .help(false); // Disable built-in help flag (users should call .help() explicitly)
+    .version(builtinVersion) // Configurable: default true for backwards compatibility
+    .help(builtinHelp); // Configurable: default true for backwards compatibility
 
   // Pass getenv helper if enabled
   const getenvHelper = getenvEnabled ? getenv : () => '';
