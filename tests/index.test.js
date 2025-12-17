@@ -960,8 +960,8 @@ describe('Built-in Flag Conflicts', () => {
       });
 
       // Should parse the custom --version option value, not trigger yargs' built-in version
-      assert.strictEqual(config.version, '1.0.0');
-      assert.strictEqual(typeof config.version, 'string');
+      expect(config.version).toBe('1.0.0');
+      expect(typeof config.version).toBe('string');
     });
 
     it('should work with custom --version option without value', () => {
@@ -976,7 +976,7 @@ describe('Built-in Flag Conflicts', () => {
       });
 
       // Should use default value
-      assert.strictEqual(config.version, '0.0.0');
+      expect(config.version).toBe('0.0.0');
     });
 
     it('should parse --version from environment via getenv', () => {
@@ -994,7 +994,7 @@ describe('Built-in Flag Conflicts', () => {
           argv: ['node', 'script.js'],
         });
 
-        assert.strictEqual(config.version, '2.0.0');
+        expect(config.version).toBe('2.0.0');
       } finally {
         process.env = { ...originalEnv };
       }
@@ -1014,8 +1014,8 @@ describe('Built-in Flag Conflicts', () => {
       });
 
       // Should parse the custom --help option value, not trigger yargs' built-in help
-      assert.strictEqual(config.help, 'https://docs.example.com');
-      assert.strictEqual(typeof config.help, 'string');
+      expect(config.help).toBe('https://docs.example.com');
+      expect(typeof config.help).toBe('string');
     });
 
     it('should work with custom --help option without value', () => {
@@ -1030,7 +1030,7 @@ describe('Built-in Flag Conflicts', () => {
       });
 
       // Should use default value
-      assert.strictEqual(config.help, 'default-help');
+      expect(config.help).toBe('default-help');
     });
 
     it('should parse --help from environment via getenv', () => {
@@ -1048,7 +1048,7 @@ describe('Built-in Flag Conflicts', () => {
           argv: ['node', 'script.js'],
         });
 
-        assert.strictEqual(config.help, 'https://help.example.com');
+        expect(config.help).toBe('https://help.example.com');
       } finally {
         process.env = { ...originalEnv };
       }
@@ -1080,8 +1080,8 @@ describe('Built-in Flag Conflicts', () => {
         ],
       });
 
-      assert.strictEqual(config.version, '3.0.0');
-      assert.strictEqual(config.help, 'https://help.example.com');
+      expect(config.version).toBe('3.0.0');
+      expect(config.help).toBe('https://help.example.com');
     });
   });
 });
