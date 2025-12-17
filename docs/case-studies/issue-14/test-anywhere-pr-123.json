@@ -1,0 +1,53 @@
+{
+  "body": "## Summary\n\nThis PR fixes the release notes formatting issue by replacing `lino-arguments` with manual argument parsing in `format-release-notes.mjs`. This ensures release notes are properly formatted with Related Pull Request links and markdown formatting.\n\n## Root Cause Analysis\n\n### The Problem\nRelease v0.8.36 (and likely others) had **unformatted release notes**:\n- Missing \"Related Pull Request\" section\n- Markdown not properly formatted (appeared in quotes)\n- Missing shields.io npm badge\n\n### Investigation Steps\n1. Compared v0.8.36 (broken) with v0.8.32 (working) release notes\n2. Downloaded and analyzed CI logs from run 20126234140\n3. Found that `format-release-notes.mjs` exited with code 1 and produced no output\n4. Tested locally and confirmed `lino-arguments` was failing to parse CLI arguments\n\n### Root Cause\n`scripts/format-release-notes.mjs` was still using `lino-arguments` for CLI argument parsing, which fails silently in GitHub Actions CI environments.\n\n**Timeline:**\n- PR #119 fixed `create-github-release.mjs` and `format-github-release.mjs` by removing `lino-arguments`\n- However, `format-release-notes.mjs` (which is called by `format-github-release.mjs`) was **never fixed**\n- The script would fail silently, preventing release notes from being formatted\n\n### Evidence\nFrom CI logs (run 20126234140):\n```\n\"stdoutLength\": 0\n\"stdoutPreview\": \"\"\n\"exitCode\": 1\n```\n\nThe script exited early with no output, meaning argument parsing failed.\n\n### lino-arguments Issue Filed\nFiled issue in lino-arguments repository to track the underlying bug: [link-foundation/lino-arguments#14](https://github.com/link-foundation/lino-arguments/issues/14)\n\nThe issue documents:\n- Reproducible example of the parsing failure in CI\n- Evidence from CI logs showing silent failures\n- Real-world impact across multiple releases\n- Workaround implementation (used in this PR)\n- Suggested investigation steps for fixing the root cause\n\n## Solution\n\nReplaced `lino-arguments` with manual `parseArgs()` function in `scripts/format-release-notes.mjs`:\n\n### Changes Made\n1. **Removed lino-arguments dependency**\n   - Removed `const { makeConfig } = await use('lino-arguments')`\n   - Removed complex `makeConfig()` yargs configuration\n\n2. **Added manual argument parser**\n   - Implemented `parseArgs()` function (same pattern as in PR #119)\n   - Supports both `--arg=value` and `--arg value` formats\n   - Falls back to environment variables\n   - Works reliably in all environments\n\n3. **Updated documentation**\n   - Updated header comment to reflect manual parsing approach\n   - Noted reliability improvement over `lino-arguments`\n\n## Testing\n\n### Local Testing\nSuccessfully formatted v0.8.36 release notes locally:\n```bash\n$ node scripts/format-release-notes.mjs --release-id \"269421006\" --version \"v0.8.36\" --repository \"link-foundation/test-anywhere\" --commit-sha \"a9c5aff2bad739c5ac961911851de3011454f507\"\n\nℹ️ Looking up PR for commit 5d6c200 (from changelog)\n✅ Found PR #121 containing commit\n✅ Formatted release notes for v0.8.36\n   - Added link to PR #121\n   - Added shields.io npm badge\n   - Cleaned up formatting\n```\n\n### Before Fix\n```\n### Patch Changes\n\n- 5d6c200: Simplify version bump commit messages\n\n  Remove Claude Code attribution and quotes from automated version bump commit messages...\n```\n\n### After Fix\n```\n## What's Changed\n\nSimplify version bump commit messages\n\nRemove Claude Code attribution and quotes from automated version bump commit messages. Commit messages now show only the version number (e.g., \"0.8.36\") instead of the previous format with attribution text.'\n\n**Related Pull Request:** #121\n\n---\n\n[![npm version](https://img.shields.io/badge/npm-0.8.36-blue.svg)](https://www.npmjs.com/package/test-anywhere/v/0.8.36)\n```\n\n### CI Checks\nAll local CI checks passed:\n- ✅ ESLint (`npm run lint`)\n- ✅ Prettier (`npm run format:check`)\n- ✅ File size limits (`npm run check:file-size`)\n- ✅ All tests (`npm test`)\n\n## Impact\n\n### Before This Fix\n- ❌ Release notes not formatted (raw changeset format)\n- ❌ Missing \"Related Pull Request\" links\n- ❌ Markdown appearing in quotes\n- ❌ Missing shields.io npm badges\n- ❌ Script failing silently in CI (exit code 1, no output)\n\n### After This Fix\n- ✅ Release notes properly formatted with markdown\n- ✅ \"Related Pull Request\" section with PR links\n- ✅ Clean markdown formatting\n- ✅ Shields.io npm badge included\n- ✅ Script works reliably in all environments\n\n## Related Issues\n\n- **Issue #122**: This issue - Fix release notes formatting\n- **Issue #118**: Previous `lino-arguments` reliability issue (PR #119)\n  - Fixed `create-github-release.mjs` and `format-github-release.mjs`\n  - Missed `format-release-notes.mjs` (this PR fixes that)\n- **lino-arguments #14**: Filed issue to track the underlying bug for future fix\n\n## Files Changed\n\n- `scripts/format-release-notes.mjs`: Replaced `lino-arguments` with manual argument parsing\n- `CLAUDE.md`: Formatting fix (prettier)\n\nFixes #122\n\n---\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+  "commits": [
+    {
+      "message": "Initial commit with task details",
+      "sha": "d420e373a04dc11f29e519f11335ef797920caa1"
+    },
+    {
+      "message": "fix: replace lino-arguments with manual parsing in format-release-not…",
+      "sha": "245a920747982e75f25d038ee3a754a34335dd7f"
+    },
+    {
+      "message": "chore: add changeset for format-release-notes fix",
+      "sha": "715382c874450cb9edb3b48b61bfc4a7bd68f1d8"
+    },
+    {
+      "message": "Revert: Remove CLAUDE.md changes from initial commit",
+      "sha": "5c4510a3b7e6984651fefc17f1e42397a0048dfb"
+    },
+    {
+      "message": "chore: add experiment scripts for lino-arguments investigation",
+      "sha": "72e827efebfc64dcb4c8950ba0399157207de41d"
+    },
+    {
+      "message": "style: apply prettier formatting to experiment scripts",
+      "sha": "b77c3c4e5161d1ac9dfaeacef0adcd92aa5ffbe6"
+    }
+  ],
+  "files": [
+    {
+      "additions": 31,
+      "deletions": 0,
+      "path": ".changeset/fix-format-release-notes.md"
+    },
+    {
+      "additions": 59,
+      "deletions": 0,
+      "path": "experiments/test-lino-arguments-ci.mjs"
+    },
+    {
+      "additions": 46,
+      "deletions": 0,
+      "path": "experiments/test-manual-parsing-workaround.mjs"
+    },
+    {
+      "additions": 32,
+      "deletions": 30,
+      "path": "scripts/format-release-notes.mjs"
+    }
+  ],
+  "state": "OPEN",
+  "title": "fix: replace lino-arguments in format-release-notes.mjs"
+}

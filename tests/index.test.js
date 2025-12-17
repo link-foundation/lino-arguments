@@ -638,6 +638,308 @@ describe('makeConfig', () => {
       }
     });
   });
+
+  describe('Built-in Flag Conflicts (Issue #14)', () => {
+    it('should allow user-defined --version option by calling .version(false)', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .version(false) // Disable built-in --version flag
+              .help(false) // Disable built-in --help flag
+              .option('version', {
+                type: 'string',
+                description: 'Version to process',
+                default: '',
+              })
+              .option('repository', {
+                type: 'string',
+                description: 'Repository name',
+                default: '',
+              })
+              .strict(),
+          argv: [
+            'node',
+            'script.js',
+            '--version',
+            '0.8.36',
+            '--repository',
+            'link-foundation/test-anywhere',
+          ],
+        });
+
+        // Should parse --version as user-defined option, not yargs' built-in
+        expect(config.version).toBe('0.8.36');
+        expect(config.repository).toBe('link-foundation/test-anywhere');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should allow user-defined --help option', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('help-text', {
+                type: 'string',
+                description: 'Help text to display',
+                default: '',
+              })
+              .strict(),
+          argv: ['node', 'script.js', '--help-text', 'Custom help message'],
+        });
+
+        // Should parse --help-text as user option
+        expect(config.helpText).toBe('Custom help message');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should work with --version in strict mode', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .version(false) // Disable built-in version to allow user-defined
+              .option('version', {
+                type: 'string',
+                default: '',
+              })
+              .option('name', {
+                type: 'string',
+                default: '',
+              })
+              .strict(),
+          argv: ['node', 'script.js', '--version', '1.2.3', '--name', 'test'],
+        });
+
+        expect(config.version).toBe('1.2.3');
+        expect(config.name).toBe('test');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should handle --version with boolean type', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .version(false) // Disable built-in version to allow user-defined
+              .option('version', {
+                type: 'boolean',
+                default: false,
+              }),
+          argv: ['node', 'script.js', '--version'],
+        });
+
+        expect(config.version).toBe(true);
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should allow users to explicitly enable help', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('port', {
+                type: 'number',
+                default: 3000,
+              })
+              .help(), // User explicitly enables help
+          argv: ['node', 'script.js', '--port', '8080'],
+        });
+
+        expect(config.port).toBe(8080);
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should work with multiple custom options including version', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs, getenv }) =>
+            yargs
+              .version(false) // Disable built-in version to allow user-defined
+              .option('version', {
+                type: 'string',
+                default: getenv('VERSION') || '',
+              })
+              .option('repository', {
+                type: 'string',
+                default: getenv('REPOSITORY') || '',
+              })
+              .option('release-id', {
+                type: 'string',
+                default: getenv('RELEASE_ID') || '',
+              })
+              .strict(),
+          argv: [
+            'node',
+            'script.js',
+            '--version',
+            'v0.8.36',
+            '--repository',
+            'test-repo',
+            '--release-id',
+            '12345',
+          ],
+        });
+
+        expect(config.version).toBe('v0.8.36');
+        expect(config.repository).toBe('test-repo');
+        expect(config.releaseId).toBe('12345');
+      } finally {
+        cleanup();
+      }
+    });
+  });
+
+  describe('Explicitly Enabling Built-in Version and Help', () => {
+    it('should allow explicitly enabling built-in --version', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('port', {
+                type: 'number',
+                default: 3000,
+              })
+              .option('host', {
+                type: 'string',
+                default: 'localhost',
+              })
+              .version('1.0.0'), // Explicitly enable built-in version
+          argv: ['node', 'script.js', '--port', '8080'],
+        });
+
+        // Config should be parsed correctly
+        expect(config.port).toBe(8080);
+        expect(config.host).toBe('localhost');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should allow explicitly enabling both --version and --help', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('debug', {
+                type: 'boolean',
+                default: false,
+              })
+              .option('verbose', {
+                type: 'boolean',
+                default: false,
+              })
+              .version('2.5.0') // Enable version
+              .help(), // Enable help
+          argv: ['node', 'script.js', '--debug', '--verbose'],
+        });
+
+        // Config should be parsed correctly
+        expect(config.debug).toBe(true);
+        expect(config.verbose).toBe(true);
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should allow version with alias', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('config', {
+                type: 'string',
+                default: './config.json',
+              })
+              .version('3.0.0')
+              .alias('version', 'v'), // Add -v alias
+          argv: ['node', 'script.js', '--config', './custom.json'],
+        });
+
+        // Config should be parsed correctly
+        expect(config.config).toBe('./custom.json');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should allow help with alias', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('port', {
+                type: 'number',
+                default: 3000,
+              })
+              .help()
+              .alias('help', 'h'), // Add -h alias
+          argv: ['node', 'script.js', '--port', '9000'],
+        });
+
+        // Config should be parsed correctly
+        expect(config.port).toBe(9000);
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('should work with both built-in version/help and custom options', () => {
+      cleanupTestEnv();
+      try {
+        const config = makeConfig({
+          yargs: ({ yargs }) =>
+            yargs
+              .option('output', {
+                type: 'string',
+                description: 'Output directory',
+                default: './output',
+              })
+              .option('format', {
+                type: 'string',
+                description: 'Output format',
+                default: 'json',
+              })
+              .version('1.2.3')
+              .help(),
+          argv: [
+            'node',
+            'script.js',
+            '--output',
+            './results',
+            '--format',
+            'xml',
+          ],
+        });
+
+        // All custom options should be parsed correctly
+        expect(config.output).toBe('./results');
+        expect(config.format).toBe('xml');
+      } finally {
+        cleanup();
+      }
+    });
+  });
 });
 
 // ============================================================================

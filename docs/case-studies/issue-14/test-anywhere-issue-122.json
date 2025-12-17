@@ -1,0 +1,5 @@
+{
+  "body": "Previously we had related pull request for releases like: https://github.com/link-foundation/test-anywhere/releases/tag/v0.8.36\n\nAnd now no related pull request was detected.\n\nAlso we don't get markdown formatted as markdown, instead it put in quotes, which is unexpected.",
+  "comments": [],
+  "title": "Fix release notes in GitHub releases"
+}
