@@ -20,9 +20,10 @@ console.log('');
 // Configure CLI arguments using lino-arguments
 console.log('=== Calling makeConfig() ===');
 const config = makeConfig({
-  builtins: { version: false, help: false }, // Disable built-in flags to allow custom --version
   yargs: ({ yargs, getenv }) =>
     yargs
+      .version(false) // Disable built-in --version flag
+      .help(false) // Disable built-in --help flag
       .option('version', {
         type: 'string',
         description: 'Version to process',

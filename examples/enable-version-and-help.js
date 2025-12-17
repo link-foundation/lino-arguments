@@ -1,18 +1,20 @@
 import { makeConfig } from '../src/index.js';
 
 /**
- * Example demonstrating how to work with yargs' built-in --version and --help flags
+ * Example: Working with yargs' built-in --version and --help flags
  *
- * By default, makeConfig() enables yargs' built-in version and help flags
- * for backwards compatibility. However, if you want to define your own
- * --version or --help options, you can disable the built-in flags using
- * the `builtins` configuration option.
+ * By default, yargs enables built-in --version and --help flags.
+ * If you want to define your own --version or --help options, you can
+ * disable the built-in flags by calling .version(false) and .help(false)
+ * on the yargs instance inside your configuration function.
+ *
+ * This approach is simple, explicit, and gives you full control.
  */
 
 console.log('=== Working with Built-in Version and Help Flags ===\n');
 
-// Example 1: Enable built-in --version flag
-console.log('1. Enabling built-in --version flag:');
+// Example 1: Enable built-in --version flag with custom version string
+console.log('1. Enabling built-in --version flag with custom version:');
 const configWithVersion = makeConfig({
   yargs: ({ yargs }) =>
     yargs
@@ -26,7 +28,7 @@ const configWithVersion = makeConfig({
         description: 'Server host',
         default: 'localhost',
       })
-      .version('1.0.0'), // Explicitly enable version with your app version
+      .version('1.0.0'), // Set your app version
 
   argv: ['node', 'script.js', '--port', '8080'],
 });
@@ -92,12 +94,14 @@ console.log('Config:', configWithPackageVersion);
 console.log('Config file:', configWithPackageVersion.config);
 console.log();
 
-// Example 4: Using custom --version option (disable built-in)
+// Example 4: Disable built-in flags to use custom --version option
+// This is the solution for Issue #14
 console.log('4. Disabling built-in flags to use custom --version:');
 const configWithCustomVersion = makeConfig({
-  builtins: { version: false, help: false }, // Disable built-in flags
   yargs: ({ yargs }) =>
     yargs
+      .version(false) // Disable built-in --version flag
+      .help(false) // Disable built-in --help flag
       .option('version', {
         type: 'string',
         description: 'Release version to process',
@@ -124,16 +128,48 @@ console.log('Version:', configWithCustomVersion.version);
 console.log('Repository:', configWithCustomVersion.repository);
 console.log();
 
+// Example 5: Disable only --version but keep --help
+console.log('5. Disable only --version but keep --help:');
+const configPartialDisable = makeConfig({
+  yargs: ({ yargs }) =>
+    yargs
+      .version(false) // Disable built-in --version
+      .option('version', {
+        type: 'string',
+        description: 'Release version',
+        default: '',
+      })
+      .option('name', {
+        type: 'string',
+        description: 'Project name',
+        default: '',
+      })
+      .help() // Keep built-in --help enabled
+      .strict(),
+  argv: ['node', 'script.js', '--version', '1.2.3', '--name', 'my-project'],
+});
+
+console.log('Config:', configPartialDisable);
+console.log('Version:', configPartialDisable.version);
+console.log('Name:', configPartialDisable.name);
+console.log();
+
 console.log('\n=== Summary ===');
+console.log('By default, yargs provides built-in --version and --help flags.');
+console.log('');
+console.log('To use your own --version or --help options:');
 console.log(
-  '✅ Built-in --version and --help are ENABLED by default (backwards compatible)'
+  '  1. Call .version(false) and/or .help(false) on the yargs instance'
 );
+console.log('  2. Define your custom options with .option()');
+console.log('');
+console.log('Example:');
+console.log('  makeConfig({');
+console.log('    yargs: ({ yargs }) =>');
+console.log('      yargs');
 console.log(
-  '✅ Explicitly call .version() and .help() in yargs config to set version string'
+  '        .version(false)  // Disable built-in to allow custom --version'
 );
-console.log(
-  '✅ To use custom --version or --help options, set builtins: { version: false, help: false }'
-);
-console.log(
-  '✅ This gives you full control over your CLI interface without breaking changes'
-);
+console.log('        .option("version", { type: "string" })');
+console.log('        .strict()');
+console.log('  })');

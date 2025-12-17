@@ -640,13 +640,14 @@ describe('makeConfig', () => {
   });
 
   describe('Built-in Flag Conflicts (Issue #14)', () => {
-    it('should allow user-defined --version option', () => {
+    it('should allow user-defined --version option by calling .version(false)', () => {
       cleanupTestEnv();
       try {
         const config = makeConfig({
-          builtins: { version: false, help: false }, // Disable built-in flags to allow user-defined options
           yargs: ({ yargs }) =>
             yargs
+              .version(false) // Disable built-in --version flag
+              .help(false) // Disable built-in --help flag
               .option('version', {
                 type: 'string',
                 description: 'Version to process',
@@ -702,9 +703,9 @@ describe('makeConfig', () => {
       cleanupTestEnv();
       try {
         const config = makeConfig({
-          builtins: { version: false }, // Disable built-in version to allow user-defined
           yargs: ({ yargs }) =>
             yargs
+              .version(false) // Disable built-in version to allow user-defined
               .option('version', {
                 type: 'string',
                 default: '',
@@ -728,12 +729,13 @@ describe('makeConfig', () => {
       cleanupTestEnv();
       try {
         const config = makeConfig({
-          builtins: { version: false }, // Disable built-in version to allow user-defined
           yargs: ({ yargs }) =>
-            yargs.option('version', {
-              type: 'boolean',
-              default: false,
-            }),
+            yargs
+              .version(false) // Disable built-in version to allow user-defined
+              .option('version', {
+                type: 'boolean',
+                default: false,
+              }),
           argv: ['node', 'script.js', '--version'],
         });
 
@@ -767,9 +769,9 @@ describe('makeConfig', () => {
       cleanupTestEnv();
       try {
         const config = makeConfig({
-          builtins: { version: false }, // Disable built-in version to allow user-defined
           yargs: ({ yargs, getenv }) =>
             yargs
+              .version(false) // Disable built-in version to allow user-defined
               .option('version', {
                 type: 'string',
                 default: getenv('VERSION') || '',
