@@ -299,6 +299,62 @@ Override values via CLI:
 $ node app.js --port 8080 --verbose
 ```
 
+## Disabling Built-in Yargs Flags
+
+By default, yargs automatically adds `--version` and `--help` flags to your CLI. If you need to define your own `--version` or `--help` options, you can disable these built-in flags by calling `.version(false)` and `.help(false)` on the yargs instance:
+
+```javascript
+const config = makeConfig({
+  yargs: ({ yargs }) =>
+    yargs
+      .version(false) // Disable built-in --version flag
+      .help(false) // Disable built-in --help flag
+      .option('version', {
+        type: 'string',
+        description: 'Release version to process',
+      })
+      .option('repository', {
+        type: 'string',
+        description: 'Repository name',
+      })
+      .strict(),
+});
+
+// Now you can use --version as your own option:
+// $ node script.js --version "1.2.3" --repository "my-repo"
+// config.version === "1.2.3" ✅
+```
+
+**Why would you need this?**
+
+When you try to define your own `--version` option without disabling the built-in flag, you'll encounter conflicts:
+
+```bash
+# With strict mode - throws error
+$ node script.js --version "1.2.3" --repository "my-repo"
+# Error: Unknown argument: 1.2.3
+
+# Without strict mode - incorrect parsing
+$ node script.js --version "1.2.3"
+# config.version === false (instead of "1.2.3")
+```
+
+**Enabling built-in flags (default behavior):**
+
+If you want to use yargs' built-in `--version` and `--help` flags with custom behavior, you can enable them explicitly:
+
+```javascript
+const config = makeConfig({
+  yargs: ({ yargs }) =>
+    yargs
+      .version('1.0.0') // Enable --version with custom version string
+      .help() // Enable --help with default help text
+      .option('port', { type: 'number', default: 3000 }),
+});
+```
+
+See [examples/enable-version-and-help.js](examples/enable-version-and-help.js) for more examples.
+
 ## Testing
 
 The library uses [test-anywhere](https://github.com/link-foundation/test-anywhere) for testing across multiple JavaScript runtimes:

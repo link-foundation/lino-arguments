@@ -1,5 +1,63 @@
 # lino-arguments
 
+## 0.2.8
+
+### Patch Changes
+
+- c89821f: Fix makeConfig() parsing failure with user-defined --version and --help options
+
+  **Problem**: When users defined their own `--version` or `--help` options in makeConfig(), yargs' built-in version and help flags would interfere with parsing, causing:
+  - With `.strict()`: "Unknown argument" errors
+  - Without `.strict()`: Options parsed as boolean `false` instead of the provided values
+
+  This issue caused silent failures in GitHub Actions CI environments, particularly affecting release scripts in the test-anywhere repository (v0.8.33-v0.8.36).
+
+  **Solution**: Disable yargs' built-in version and help flags by default in makeConfig() by adding `.version(false)` and `.help(false)` to the yargs instance. Users who want these built-in behaviors can explicitly enable them in their yargs configuration:
+
+  ```javascript
+  const config = makeConfig({
+    yargs: ({ yargs, getenv }) =>
+      yargs
+        .option('port', { default: getenv('PORT', 3000) })
+        .version('1.0.0') // Explicit version
+        .help(), // Explicit help
+  });
+  ```
+
+  **Impact**: This fix allows users to define their own `--version` and `--help` options without conflicts, giving full control over the CLI interface.
+
+  **Testing**: Added comprehensive tests for `--version` and `--help` option conflicts in strict mode.
+
+  Fixes #14
+
+## 0.2.7
+
+### Patch Changes
+
+- d11aa3c: docs: add comprehensive case study for issue #10 trusted publishing analysis
+
+  This PR provides detailed documentation and analysis for Issue #10, which covered npm trusted publishing failures in our CI/CD pipeline.
+
+  **Documentation added:**
+  - Comprehensive analysis of E422 error (missing repository field) - RESOLVED
+  - Detailed investigation of E404 error with manual workflow_dispatch triggers
+  - Comparison of authentication strategies (NPM_TOKEN vs OIDC)
+  - Workflow comparison with test-anywhere reference repository
+  - Evidence-based findings from online research
+  - Complete CI logs preserved in ci-logs/ directory
+  - Timeline reconstruction and root cause analysis
+  - Proposed solutions with trade-off analysis
+
+  **Key findings:**
+  1. E422 error was caused by missing `repository` field in package.json - fixed in PR #11
+  2. E404 error for manual releases is likely due to OIDC/Trusted Publisher configuration mismatch with workflow_dispatch triggers
+  3. test-anywhere uses NPM_TOKEN authentication which works reliably for all trigger types
+  4. Multiple solution options proposed (NPM_TOKEN fallback, Trusted Publisher config, unified workflows, etc.)
+
+  This documentation serves as a valuable reference for future npm publishing issues and OIDC troubleshooting.
+
+  Related: Issue #10, PR #11
+
 ## 0.2.6
 
 ### Patch Changes
