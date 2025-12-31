@@ -1,0 +1,317 @@
+name: Rust CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'rust/**'
+      - 'scripts/**'
+      - '.github/workflows/rust.yml'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'rust/**'
+      - 'scripts/**'
+      - '.github/workflows/rust.yml'
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      description:
+        description: 'Release description (optional)'
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+
+defaults:
+  run:
+    working-directory: rust
+
+jobs:
+  # Changelog check - only runs on PRs
+  changelog:
+    name: Changelog Fragment Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for changelog fragments
+        run: |
+          # Get list of fragment files (excluding README)
+          FRAGMENTS=$(find changelog.d -name "*.md" ! -name "README.md" 2>/dev/null | wc -l)
+
+          # Get changed files in PR
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+
+          # Check if any source files changed
+          SOURCE_CHANGED=$(echo "$CHANGED_FILES" | grep -E "^rust/(src/|tests/|Cargo\.toml)" | wc -l)
+
+          if [ "$SOURCE_CHANGED" -gt 0 ] && [ "$FRAGMENTS" -eq 0 ]; then
+            echo "::warning::No changelog fragment found. Please add a changelog entry in rust/changelog.d/"
+            exit 0
+          fi
+
+          echo "Changelog check passed"
+
+  # Lint and Format Check
+  lint:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+    needs: [changelog]
+    if: always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changelog.result == 'success' || needs.changelog.result == 'skipped')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features
+
+      - name: Check file size limit
+        working-directory: .
+        run: node scripts/check-file-size.mjs
+
+  # Test
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: [changelog]
+    if: always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changelog.result == 'success' || needs.changelog.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run tests
+        run: cargo test --all-features --verbose
+
+      - name: Run doc tests
+        run: cargo test --doc --verbose
+
+  # Build
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    if: always() && needs.lint.result == 'success' && needs.test.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-
+
+      - name: Build release
+        run: cargo build --release --verbose
+
+      - name: Check package
+        run: cargo package --list
+
+  # Auto Release - on push to main
+  auto-release:
+    name: Auto Release
+    needs: [lint, test, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine bump type from changelog fragments
+        id: bump_type
+        working-directory: .
+        run: node scripts/get-bump-type.mjs --changelog-dir rust/changelog.d
+
+      - name: Check if version already released
+        id: check
+        run: |
+          if [ "${{ steps.bump_type.outputs.has_fragments }}" != "true" ]; then
+            CURRENT_VERSION=$(grep -Po '(?<=^version = ")[^"]*' Cargo.toml)
+            if git rev-parse "rust-v$CURRENT_VERSION" >/dev/null 2>&1; then
+              echo "No changelog fragments and rust-v$CURRENT_VERSION already released"
+              echo "should_release=false" >> $GITHUB_OUTPUT
+            else
+              echo "No changelog fragments but rust-v$CURRENT_VERSION not yet released"
+              echo "should_release=true" >> $GITHUB_OUTPUT
+              echo "skip_bump=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "Found changelog fragments, proceeding with release"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "skip_bump=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Collect changelog and bump version
+        id: version
+        if: steps.check.outputs.should_release == 'true' && steps.check.outputs.skip_bump != 'true'
+        working-directory: .
+        run: |
+          node scripts/version-and-commit.mjs \
+            --bump-type "${{ steps.bump_type.outputs.bump_type }}" \
+            --manifest rust/Cargo.toml \
+            --changelog-dir rust/changelog.d
+
+      - name: Get current version
+        id: current_version
+        if: steps.check.outputs.should_release == 'true'
+        run: |
+          CURRENT_VERSION=$(grep -Po '(?<=^version = ")[^"]*' Cargo.toml)
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build release
+        if: steps.check.outputs.should_release == 'true'
+        run: cargo build --release
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: .
+        run: |
+          node scripts/create-github-release.mjs \
+            --release-version "${{ steps.current_version.outputs.version }}" \
+            --repository "${{ github.repository }}" \
+            --tag-prefix "rust-v"
+
+  # Manual Release
+  manual-release:
+    name: Manual Release
+    needs: [lint, test, build]
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Collect changelog fragments
+        run: |
+          FRAGMENTS=$(find changelog.d -name "*.md" ! -name "README.md" 2>/dev/null | wc -l)
+          if [ "$FRAGMENTS" -gt 0 ]; then
+            echo "Found $FRAGMENTS changelog fragment(s), collecting..."
+            node ../scripts/collect-changelog.mjs --changelog-dir changelog.d
+          else
+            echo "No changelog fragments found, skipping collection"
+          fi
+
+      - name: Version and commit
+        id: version
+        working-directory: .
+        run: |
+          node scripts/version-and-commit.mjs \
+            --bump-type "${{ github.event.inputs.bump_type }}" \
+            --description "${{ github.event.inputs.description }}" \
+            --manifest rust/Cargo.toml
+
+      - name: Build release
+        if: steps.version.outputs.version_committed == 'true' || steps.version.outputs.already_released == 'true'
+        run: cargo build --release
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.version_committed == 'true' || steps.version.outputs.already_released == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: .
+        run: |
+          node scripts/create-github-release.mjs \
+            --release-version "${{ steps.version.outputs.new_version }}" \
+            --repository "${{ github.repository }}" \
+            --tag-prefix "rust-v"
