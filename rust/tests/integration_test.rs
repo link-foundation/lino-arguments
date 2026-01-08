@@ -1,10 +1,14 @@
 //! Integration tests for lino-arguments
 
 use lino_arguments::{
-    getenv, getenv_bool, getenv_int, to_camel_case, to_kebab_case, to_pascal_case, to_snake_case,
-    to_upper_case,
+    getenv, getenv_bool, getenv_int, load_lenv_file, load_lenv_file_override, read_lino_env,
+    to_camel_case, to_kebab_case, to_pascal_case, to_snake_case, to_upper_case, write_lino_env,
+    LinoEnv,
 };
+use std::collections::HashMap;
 use std::env;
+use std::fs;
+use tempfile::tempdir;
 
 // ============================================================================
 // Case Conversion Tests
@@ -149,5 +153,161 @@ mod getenv_tests {
         let result = getenv_bool("LINO_TEST_BOOL_INVALID", true);
         assert!(result);
         env::remove_var("LINO_TEST_BOOL_INVALID");
+    }
+}
+
+// ============================================================================
+// .lenv File Loading Tests
+// ============================================================================
+
+mod lenv_file_tests {
+    use super::*;
+
+    #[test]
+    fn test_load_lenv_file_sets_env_vars() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test.lenv");
+        let file_path_str = file_path.to_str().unwrap();
+
+        // Write a test .lenv file
+        fs::write(
+            &file_path,
+            "LINO_TEST_LENV_PORT: 9090\nLINO_TEST_LENV_HOST: localhost\n",
+        )
+        .unwrap();
+
+        // Ensure env vars don't exist before loading
+        env::remove_var("LINO_TEST_LENV_PORT");
+        env::remove_var("LINO_TEST_LENV_HOST");
+
+        // Load the file
+        let loaded = load_lenv_file(file_path_str).unwrap();
+        assert_eq!(loaded, 2);
+
+        // Check env vars are set
+        assert_eq!(env::var("LINO_TEST_LENV_PORT").unwrap(), "9090");
+        assert_eq!(env::var("LINO_TEST_LENV_HOST").unwrap(), "localhost");
+
+        // Cleanup
+        env::remove_var("LINO_TEST_LENV_PORT");
+        env::remove_var("LINO_TEST_LENV_HOST");
+    }
+
+    #[test]
+    fn test_load_lenv_file_does_not_overwrite_existing() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test2.lenv");
+        let file_path_str = file_path.to_str().unwrap();
+
+        // Write a test .lenv file
+        fs::write(&file_path, "LINO_TEST_LENV_EXISTING: from_file\n").unwrap();
+
+        // Set the env var before loading
+        env::set_var("LINO_TEST_LENV_EXISTING", "from_env");
+
+        // Load the file
+        let loaded = load_lenv_file(file_path_str).unwrap();
+        assert_eq!(loaded, 0); // Should not have loaded anything
+
+        // Check env var was NOT overwritten
+        assert_eq!(env::var("LINO_TEST_LENV_EXISTING").unwrap(), "from_env");
+
+        // Cleanup
+        env::remove_var("LINO_TEST_LENV_EXISTING");
+    }
+
+    #[test]
+    fn test_load_lenv_file_override_overwrites() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test3.lenv");
+        let file_path_str = file_path.to_str().unwrap();
+
+        // Write a test .lenv file
+        fs::write(&file_path, "LINO_TEST_LENV_OVERRIDE: from_file\n").unwrap();
+
+        // Set the env var before loading
+        env::set_var("LINO_TEST_LENV_OVERRIDE", "from_env");
+
+        // Load the file with override
+        let loaded = load_lenv_file_override(file_path_str).unwrap();
+        assert_eq!(loaded, 1);
+
+        // Check env var WAS overwritten
+        assert_eq!(env::var("LINO_TEST_LENV_OVERRIDE").unwrap(), "from_file");
+
+        // Cleanup
+        env::remove_var("LINO_TEST_LENV_OVERRIDE");
+    }
+
+    #[test]
+    fn test_load_lenv_file_nonexistent_returns_ok() {
+        // Loading a non-existent file should not error (per lino-env behavior)
+        let result = load_lenv_file("/nonexistent/path/to/file.lenv");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_lino_env_reexport_works() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("reexport.lenv");
+        let file_path_str = file_path.to_str().unwrap();
+
+        // Test LinoEnv direct usage through re-export
+        let mut lenv = LinoEnv::new(file_path_str);
+        lenv.set("TEST_KEY", "test_value");
+        lenv.write().unwrap();
+
+        // Read it back using read_lino_env
+        let loaded = read_lino_env(file_path_str).unwrap();
+        assert_eq!(loaded.get("TEST_KEY"), Some("test_value".to_string()));
+    }
+
+    #[test]
+    fn test_write_lino_env_reexport_works() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("write_test.lenv");
+        let file_path_str = file_path.to_str().unwrap();
+
+        // Test write_lino_env convenience function
+        let mut data = HashMap::new();
+        data.insert("KEY1".to_string(), "value1".to_string());
+        data.insert("KEY2".to_string(), "value2".to_string());
+
+        write_lino_env(file_path_str, &data).unwrap();
+
+        // Verify the file was written
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert!(content.contains("KEY1: value1") || content.contains("KEY2: value2"));
+    }
+}
+
+// ============================================================================
+// Integration Tests - getenv with lenv file
+// ============================================================================
+
+mod getenv_with_lenv {
+    use super::*;
+
+    #[test]
+    fn test_getenv_works_with_loaded_lenv_file() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("integration.lenv");
+        let file_path_str = file_path.to_str().unwrap();
+
+        // Write a test .lenv file
+        fs::write(&file_path, "LINO_TEST_INTEGRATION_VAR: from_lenv_file\n").unwrap();
+
+        // Ensure env var doesn't exist
+        env::remove_var("LINO_TEST_INTEGRATION_VAR");
+
+        // Load the file
+        load_lenv_file(file_path_str).unwrap();
+
+        // Now getenv should find the value
+        let result = getenv("LINO_TEST_INTEGRATION_VAR", "default");
+        assert_eq!(result, "from_lenv_file");
+
+        // Cleanup
+        env::remove_var("LINO_TEST_INTEGRATION_VAR");
     }
 }

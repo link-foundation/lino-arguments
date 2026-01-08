@@ -12,16 +12,30 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use lino_arguments::{Config, getenv};
+//! use lino_arguments::{getenv, load_lenv_file};
 //!
-//! let config = Config::builder()
-//!     .port(getenv("PORT", 3000))
-//!     .verbose(false)
-//!     .build();
+//! // Load variables from a .lenv file into the environment
+//! load_lenv_file(".lenv").ok();
+//!
+//! // Now getenv will find values from the loaded file
+//! let api_key = getenv("API_KEY", "default-key");
+//! ```
+//!
+//! # .lenv File Format
+//!
+//! The `.lenv` file format uses `: ` (colon-space) as the separator:
+//!
+//! ```text
+//! PORT: 8080
+//! API_KEY: my-secret-key
+//! DEBUG: true
 //! ```
 
 use std::env;
 use thiserror::Error;
+
+// Re-export lino-env for direct file operations
+pub use lino_env::{read_lino_env, write_lino_env, LinoEnv};
 
 // ============================================================================
 // Error Types
@@ -38,6 +52,86 @@ pub enum ConfigError {
 
     #[error("Configuration file error: {0}")]
     FileError(String),
+
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+}
+
+// ============================================================================
+// .lenv File Loading
+// ============================================================================
+
+/// Load environment variables from a `.lenv` file.
+///
+/// This function reads a `.lenv` configuration file and sets the values
+/// as environment variables. If the file doesn't exist, this function
+/// returns Ok without setting any variables.
+///
+/// Note: Existing environment variables are NOT overwritten. This follows
+/// the principle that environment variables have higher priority than
+/// configuration files.
+///
+/// # Arguments
+///
+/// * `file_path` - Path to the `.lenv` file
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// use lino_arguments::load_lenv_file;
+///
+/// // Load from default .lenv file
+/// load_lenv_file(".lenv").ok();
+///
+/// // Load from custom path
+/// load_lenv_file("config/production.lenv")?;
+/// ```
+pub fn load_lenv_file(file_path: &str) -> Result<usize, ConfigError> {
+    let lenv = read_lino_env(file_path)?;
+    let mut loaded_count = 0;
+
+    for key in lenv.keys() {
+        // Only set if not already present in environment
+        if env::var(&key).is_err() {
+            if let Some(value) = lenv.get(&key) {
+                env::set_var(&key, &value);
+                loaded_count += 1;
+            }
+        }
+    }
+
+    Ok(loaded_count)
+}
+
+/// Load environment variables from a `.lenv` file, overwriting existing values.
+///
+/// Unlike `load_lenv_file`, this function will overwrite any existing
+/// environment variables with the values from the file.
+///
+/// # Arguments
+///
+/// * `file_path` - Path to the `.lenv` file
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// use lino_arguments::load_lenv_file_override;
+///
+/// // Force load values, overwriting any existing env vars
+/// load_lenv_file_override("config/override.lenv")?;
+/// ```
+pub fn load_lenv_file_override(file_path: &str) -> Result<usize, ConfigError> {
+    let lenv = read_lino_env(file_path)?;
+    let mut loaded_count = 0;
+
+    for key in lenv.keys() {
+        if let Some(value) = lenv.get(&key) {
+            env::set_var(&key, &value);
+            loaded_count += 1;
+        }
+    }
+
+    Ok(loaded_count)
 }
 
 // ============================================================================
