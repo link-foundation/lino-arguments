@@ -6,13 +6,11 @@ on:
       - main
     paths:
       - 'js/**'
-      - 'scripts/**'
       - '.github/workflows/js.yml'
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - 'js/**'
-      - 'scripts/**'
       - '.github/workflows/js.yml'
   workflow_dispatch:
     inputs:
@@ -37,18 +35,53 @@ on:
         required: false
         type: string
 
-concurrency: ${{ github.workflow }}-${{ github.ref }}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 defaults:
   run:
     working-directory: js
 
 jobs:
-  # Changeset check - only runs on PRs
+  # === DETECT CHANGES - determines which jobs should run ===
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch'
+    outputs:
+      js-changed: ${{ steps.changes.outputs.js-changed }}
+      package-changed: ${{ steps.changes.outputs.package-changed }}
+      mjs-changed: ${{ steps.changes.outputs.mjs-changed }}
+      docs-changed: ${{ steps.changes.outputs.docs-changed }}
+      js-workflow-changed: ${{ steps.changes.outputs.js-workflow-changed }}
+      js-code-changed: ${{ steps.changes.outputs.js-code-changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Detect changes
+        id: changes
+        working-directory: .
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/detect-code-changes.mjs
+
+  # === CHANGESET CHECK - only runs on PRs with JS code changes ===
+  # Docs-only PRs don't require changesets
   changeset-check:
     name: Check for Changesets
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    needs: [detect-changes]
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.js-code-changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -63,6 +96,10 @@ jobs:
         run: npm install
 
       - name: Check for changesets
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           # Skip changeset check for automated version PRs
           if [[ "${{ github.head_ref }}" == "changeset-release/"* ]]; then
@@ -73,12 +110,55 @@ jobs:
           # Run changeset validation script
           node ../scripts/validate-changeset.mjs
 
-  # Linting and formatting - runs after changeset check on PRs, immediately on main
+  # === VERSION CHECK - prevents manual version modification in PRs ===
+  version-check:
+    name: Version Modification Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Check for manual version changes
+        working-directory: js
+        env:
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: |
+          # Skip version check for automated release PRs
+          if [[ "${{ github.head_ref }}" == "changeset-release/"* ]]; then
+            echo "Skipping version check for automated release PR"
+            exit 0
+          fi
+
+          # Check if package.json version was manually changed
+          VERSION_DIFF=$(git diff "origin/${{ github.base_ref }}"...HEAD -- package.json | grep '"version"' || true)
+          if [ -n "$VERSION_DIFF" ]; then
+            echo "::error::Manual version changes in package.json are not allowed. Version bumps should be handled by the CI/CD pipeline."
+            exit 1
+          fi
+          echo "No manual version changes detected."
+
+  # === LINT AND FORMAT CHECK ===
   lint:
     name: Lint and Format Check
     runs-on: ubuntu-latest
-    needs: [changeset-check]
-    if: always() && (github.event_name == 'push' || needs.changeset-check.result == 'success')
+    needs: [detect-changes]
+    # Note: always() is required because detect-changes is skipped on workflow_dispatch
+    if: |
+      always() && !cancelled() && (
+        github.event_name == 'push' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.detect-changes.outputs.js-changed == 'true' ||
+        needs.detect-changes.outputs.package-changed == 'true' ||
+        needs.detect-changes.outputs.js-workflow-changed == 'true'
+      )
     steps:
       - uses: actions/checkout@v4
 
@@ -103,8 +183,9 @@ jobs:
   test:
     name: Test (${{ matrix.runtime }} on ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    needs: [changeset-check]
-    if: always() && (github.event_name == 'push' || needs.changeset-check.result == 'success')
+    needs: [detect-changes, changeset-check]
+    # Run if: push event, OR changeset-check succeeded, OR changeset-check was skipped (docs-only PR or no JS changes)
+    if: always() && !cancelled() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changeset-check.result == 'success' || needs.changeset-check.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
@@ -171,7 +252,8 @@ jobs:
   release:
     name: Release
     needs: [lint, test]
-    if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.lint.result == 'success' && needs.test.result == 'success'
+    # Use always() to ensure this job runs even if changeset-check was skipped
+    if: always() && !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.lint.result == 'success' && needs.test.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
