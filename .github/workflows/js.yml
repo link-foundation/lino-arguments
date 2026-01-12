@@ -56,6 +56,7 @@ jobs:
       docs-changed: ${{ steps.changes.outputs.docs-changed }}
       js-workflow-changed: ${{ steps.changes.outputs.js-workflow-changed }}
       js-code-changed: ${{ steps.changes.outputs.js-code-changed }}
+      js-package-changed: ${{ steps.changes.outputs.js-package-changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -75,13 +76,14 @@ jobs:
           GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node scripts/detect-code-changes.mjs
 
-  # === CHANGESET CHECK - only runs on PRs with JS code changes ===
+  # === CHANGESET CHECK - only runs on PRs with JS package code changes ===
   # Docs-only PRs don't require changesets
+  # Workflow-only changes don't require changesets (they don't affect the package)
   changeset-check:
     name: Check for Changesets
     runs-on: ubuntu-latest
     needs: [detect-changes]
-    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.js-code-changed == 'true'
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.js-package-changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:

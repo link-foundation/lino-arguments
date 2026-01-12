@@ -64,6 +64,7 @@ jobs:
       rust-workflow-changed: ${{ steps.changes.outputs.rust-workflow-changed }}
       any-code-changed: ${{ steps.changes.outputs.any-code-changed }}
       rust-code-changed: ${{ steps.changes.outputs.rust-code-changed }}
+      rust-package-changed: ${{ steps.changes.outputs.rust-package-changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -83,13 +84,14 @@ jobs:
           GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node scripts/detect-code-changes.mjs
 
-  # === CHANGELOG CHECK - only runs on PRs with Rust code changes ===
+  # === CHANGELOG CHECK - only runs on PRs with Rust package code changes ===
   # Docs-only PRs (./docs folder, markdown files) don't require changelog fragments
+  # Workflow-only changes don't require changelog fragments (they don't affect the package)
   changelog:
     name: Changelog Fragment Check
     runs-on: ubuntu-latest
     needs: [detect-changes]
-    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.rust-code-changed == 'true'
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.rust-package-changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:

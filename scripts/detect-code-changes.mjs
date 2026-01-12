@@ -153,7 +153,7 @@ function isExcludedFromCodeChanges(filePath) {
 }
 
 /**
- * Check if a file is Rust-related
+ * Check if a file is Rust-related (for triggering Rust CI/CD)
  * @param {string} filePath - The file path to check
  * @returns {boolean} True if the file is Rust-related
  */
@@ -174,7 +174,7 @@ function isRustRelated(filePath) {
 }
 
 /**
- * Check if a file is JS-related
+ * Check if a file is JS-related (for triggering JS CI/CD)
  * @param {string} filePath - The file path to check
  * @returns {boolean} True if the file is JS-related
  */
@@ -185,6 +185,40 @@ function isJsRelated(filePath) {
   }
   // JS workflow
   if (filePath === '.github/workflows/js.yml') {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Check if a file is part of Rust package code (requires changelog fragment)
+ * @param {string} filePath - The file path to check
+ * @returns {boolean} True if the file is part of Rust package code
+ */
+function isRustPackageCode(filePath) {
+  // Only files in rust/ folder that are not docs/changelog
+  if (filePath.startsWith('rust/')) {
+    // Exclude changelog fragments and docs
+    if (filePath.startsWith('rust/changelog.d/')) {
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Check if a file is part of JS package code (requires changeset)
+ * @param {string} filePath - The file path to check
+ * @returns {boolean} True if the file is part of JS package code
+ */
+function isJsPackageCode(filePath) {
+  // Only files in js/ folder that are not docs/changeset
+  if (filePath.startsWith('js/')) {
+    // Exclude changeset files
+    if (filePath.startsWith('js/.changeset/')) {
+      return false;
+    }
     return true;
   }
   return false;
@@ -281,22 +315,38 @@ function detectChanges() {
   const codeChanged = codeChangedFiles.some((file) => codePattern.test(file));
   setOutput('any-code-changed', codeChanged ? 'true' : 'false');
 
-  // Detect Rust-specific code changes
+  // Detect Rust-specific code changes (triggers Rust CI/CD)
   const rustCodeChanged = codeChangedFiles.some(
     (file) => isRustRelated(file) && codePattern.test(file)
   );
   setOutput('rust-code-changed', rustCodeChanged ? 'true' : 'false');
 
-  // Detect JS-specific code changes
+  // Detect JS-specific code changes (triggers JS CI/CD)
   const jsCodeChanged = codeChangedFiles.some(
     (file) => isJsRelated(file) && codePattern.test(file)
   );
   setOutput('js-code-changed', jsCodeChanged ? 'true' : 'false');
 
+  // Detect Rust package code changes (requires changelog fragment)
+  // This excludes workflow file changes - only actual package code matters
+  const rustPackageChanged = codeChangedFiles.some(
+    (file) => isRustPackageCode(file) && codePattern.test(file)
+  );
+  setOutput('rust-package-changed', rustPackageChanged ? 'true' : 'false');
+
+  // Detect JS package code changes (requires changeset)
+  // This excludes workflow file changes - only actual package code matters
+  const jsPackageChanged = codeChangedFiles.some(
+    (file) => isJsPackageCode(file) && codePattern.test(file)
+  );
+  setOutput('js-package-changed', jsPackageChanged ? 'true' : 'false');
+
   // Log summary for debugging
   console.log('\nLanguage-specific detection:');
   console.log(`  Rust-related changes: ${rustCodeChanged}`);
   console.log(`  JS-related changes: ${jsCodeChanged}`);
+  console.log(`  Rust package code changes: ${rustPackageChanged}`);
+  console.log(`  JS package code changes: ${jsPackageChanged}`);
   console.log(`  Shared scripts changed: ${mjsChanged}`);
 
   console.log('\nChange detection completed.');
