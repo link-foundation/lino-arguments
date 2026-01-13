@@ -161,10 +161,17 @@ name = "lino-arguments"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "lino-env",
  "serde",
  "tempfile",
  "thiserror",
 ]
+
+[[package]]
+name = "lino-env"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f453c53827aabe91a3d3856d61d14ae3867ab1a4344db22f9fa5396664c8d0e"
 
 [[package]]
 name = "linux-raw-sys"

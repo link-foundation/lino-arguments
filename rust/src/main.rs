@@ -3,7 +3,7 @@
 //! This is a simple CLI example showing how to use lino-arguments.
 
 use clap::Parser;
-use lino_arguments::{getenv, getenv_bool, getenv_int};
+use lino_arguments::{getenv, getenv_bool, getenv_int, load_lenv_file};
 
 /// A unified configuration example
 #[derive(Parser, Debug)]
@@ -23,7 +23,7 @@ struct Args {
     #[arg(short, long, env = "VERBOSE")]
     verbose: bool,
 
-    /// Configuration file path
+    /// Configuration file path (.lenv format)
     #[arg(short, long)]
     configuration: Option<String>,
 }
@@ -36,8 +36,20 @@ struct Config {
     configuration: Option<String>,
 }
 
-impl From<Args> for Config {
-    fn from(args: Args) -> Self {
+impl Config {
+    fn from_args(args: Args) -> Self {
+        // Load configuration file if specified
+        // This sets environment variables from the .lenv file
+        // (only for values not already set in the environment)
+        if let Some(ref config_path) = args.configuration {
+            if let Err(e) = load_lenv_file(config_path) {
+                eprintln!(
+                    "Warning: Failed to load config file '{}': {}",
+                    config_path, e
+                );
+            }
+        }
+
         Config {
             port: args.port.unwrap_or_else(|| getenv_int("PORT", 3000) as u16),
             api_key: args.api_key.unwrap_or_else(|| getenv("API_KEY", "")),
@@ -49,7 +61,7 @@ impl From<Args> for Config {
 
 fn main() {
     let args = Args::parse();
-    let config = Config::from(args);
+    let config = Config::from_args(args);
 
     if config.verbose {
         println!("Configuration loaded:");
