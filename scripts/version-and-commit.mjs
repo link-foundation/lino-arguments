@@ -1,98 +1,71 @@
 #!/usr/bin/env node
 
 /**
- * Version packages and commit to main
- * Usage: node scripts/version-and-commit.mjs --mode <changeset|instant> [--bump-type <type>] [--description <desc>]
- *   changeset: Run changeset version
- *   instant: Run instant version bump with bump_type (patch|minor|major) and optional description
+ * Bump version in Cargo.toml and commit changes
+ * Used by the CI/CD pipeline for releases
  *
- * Uses link-foundation libraries:
- * - use-m: Dynamic package loading without package.json dependencies
- * - command-stream: Modern shell command execution with streaming support
- * - lino-arguments: Unified configuration from CLI args, env vars, and .lenv files
+ * Supports both single-language and multi-language repository structures:
+ * - Single-language: Cargo.toml and changelog.d/ in repository root
+ * - Multi-language: Cargo.toml and changelog.d/ in rust/ subfolder
+ *
+ * Usage: node scripts/version-and-commit.mjs --bump-type <major|minor|patch> [--description <desc>] [--rust-root <path>]
+ *
+ * Environment variables:
+ *   - BUMP_TYPE: Version bump type
+ *   - DESCRIPTION: Release description
+ *   - RUST_ROOT: Optional path to Rust package root
+ *
+ * Outputs (written to GITHUB_OUTPUT):
+ *   - version_committed: 'true' if version was bumped and committed
+ *   - already_released: 'true' if version was already released
+ *   - new_version: The new version number
  */
 
-import { readFileSync, appendFileSync, readdirSync } from 'fs';
+import { readFileSync, writeFileSync, appendFileSync, readdirSync, existsSync } from 'fs';
+import { execSync } from 'child_process';
+import { join } from 'path';
+import {
+  getRustRoot,
+  getCargoTomlPath,
+  getChangelogDir,
+  getChangelogPath,
+  parseRustRootConfig,
+} from './rust-paths.mjs';
 
-// Load use-m dynamically
-const { use } = eval(
-  await (await fetch('https://unpkg.com/use-m/use.js')).text()
-);
-
-// Import link-foundation libraries
-const { $ } = await use('command-stream');
-const { makeConfig } = await use('lino-arguments');
-
-// Parse CLI arguments using lino-arguments
-const config = makeConfig({
-  yargs: ({ yargs, getenv }) =>
-    yargs
-      .option('mode', {
-        type: 'string',
-        default: getenv('MODE', 'changeset'),
-        describe: 'Version mode: changeset or instant',
-        choices: ['changeset', 'instant'],
-      })
-      .option('bump-type', {
-        type: 'string',
-        default: getenv('BUMP_TYPE', ''),
-        describe: 'Version bump type for instant mode: major, minor, or patch',
-      })
-      .option('description', {
-        type: 'string',
-        default: getenv('DESCRIPTION', ''),
-        describe: 'Description for instant version bump',
-      }),
-});
-
-const { mode, bumpType, description } = config;
-
-// Debug: Log parsed configuration
-console.log('Parsed configuration:', {
-  mode,
-  bumpType,
-  description: description || '(none)',
-});
-
-// Detect if positional arguments were used (common mistake)
+// Parse CLI arguments
 const args = process.argv.slice(2);
-if (args.length > 0 && !args[0].startsWith('--')) {
-  console.error('Error: Positional arguments detected!');
-  console.error('Command line arguments:', args);
-  console.error('');
+const getArg = (name, defaultValue) => {
+  const index = args.indexOf(`--${name}`);
+  return index >= 0 && args[index + 1] ? args[index + 1] : defaultValue;
+};
+
+const bumpType = getArg('bump-type', process.env.BUMP_TYPE || '');
+const description = getArg('description', process.env.DESCRIPTION || '');
+
+// Get Rust package root (auto-detect or use explicit config)
+const rustRootConfig = parseRustRootConfig();
+const rustRoot = getRustRoot({ rustRoot: rustRootConfig || undefined, verbose: true });
+
+// Get paths based on detected/configured rust root
+const CARGO_TOML = getCargoTomlPath({ rustRoot });
+const CHANGELOG_DIR = getChangelogDir({ rustRoot });
+const CHANGELOG_FILE = getChangelogPath({ rustRoot });
+
+if (!bumpType || !['major', 'minor', 'patch'].includes(bumpType)) {
   console.error(
-    'This script requires named arguments (--mode, --bump-type, --description).'
+    'Usage: node scripts/version-and-commit.mjs --bump-type <major|minor|patch> [--description <desc>] [--rust-root <path>]'
   );
-  console.error('Usage:');
-  console.error('  Changeset mode:');
-  console.error('    node scripts/version-and-commit.mjs --mode changeset');
-  console.error('  Instant mode:');
-  console.error(
-    '    node scripts/version-and-commit.mjs --mode instant --bump-type <major|minor|patch> [--description <desc>]'
-  );
-  console.error('');
-  console.error('Examples:');
-  console.error(
-    '  node scripts/version-and-commit.mjs --mode instant --bump-type patch --description "Fix bug"'
-  );
-  console.error('  node scripts/version-and-commit.mjs --mode changeset');
   process.exit(1);
 }
 
-// Validation: Ensure mode is set correctly
-if (mode !== 'changeset' && mode !== 'instant') {
-  console.error(`Invalid mode: "${mode}". Expected "changeset" or "instant".`);
-  console.error('Command line arguments:', process.argv.slice(2));
-  process.exit(1);
-}
-
-// Validation: Ensure bump type is provided for instant mode
-if (mode === 'instant' && !bumpType) {
-  console.error('Error: --bump-type is required for instant mode');
-  console.error(
-    'Usage: node scripts/version-and-commit.mjs --mode instant --bump-type <major|minor|patch> [--description <desc>]'
-  );
-  process.exit(1);
+/**
+ * Execute a shell command
+ * @param {string} command - The command to execute
+ * @param {Object} options - Execution options
+ * @returns {string} - The command output
+ */
+function exec(command, options = {}) {
+  return execSync(command, { encoding: 'utf-8', ...options });
 }
 
 /**
@@ -105,129 +78,214 @@ function setOutput(key, value) {
   if (outputFile) {
     appendFileSync(outputFile, `${key}=${value}\n`);
   }
+  // Log for visibility (plain log, not deprecated ::set-output command)
+  console.log(`Output: ${key}=${value}`);
 }
 
 /**
- * Count changeset files (excluding README.md)
+ * Get current version from Cargo.toml
+ * @returns {{major: number, minor: number, patch: number}}
  */
-function countChangesets() {
+function getCurrentVersion() {
+  const cargoToml = readFileSync(CARGO_TOML, 'utf-8');
+  const match = cargoToml.match(/^version\s*=\s*"(\d+)\.(\d+)\.(\d+)"/m);
+
+  if (!match) {
+    console.error(`Error: Could not parse version from ${CARGO_TOML}`);
+    process.exit(1);
+  }
+
+  return {
+    major: parseInt(match[1], 10),
+    minor: parseInt(match[2], 10),
+    patch: parseInt(match[3], 10),
+  };
+}
+
+/**
+ * Calculate new version based on bump type
+ * @param {{major: number, minor: number, patch: number}} current
+ * @param {string} bumpType
+ * @returns {string}
+ */
+function calculateNewVersion(current, bumpType) {
+  const { major, minor, patch } = current;
+
+  switch (bumpType) {
+    case 'major':
+      return `${major + 1}.0.0`;
+    case 'minor':
+      return `${major}.${minor + 1}.0`;
+    case 'patch':
+      return `${major}.${minor}.${patch + 1}`;
+    default:
+      throw new Error(`Invalid bump type: ${bumpType}`);
+  }
+}
+
+/**
+ * Update version in Cargo.toml
+ * @param {string} newVersion
+ */
+function updateCargoToml(newVersion) {
+  let cargoToml = readFileSync(CARGO_TOML, 'utf-8');
+  cargoToml = cargoToml.replace(
+    /^(version\s*=\s*")[^"]+(")/m,
+    `$1${newVersion}$2`
+  );
+  writeFileSync(CARGO_TOML, cargoToml, 'utf-8');
+  console.log(`Updated ${CARGO_TOML} to version ${newVersion}`);
+}
+
+/**
+ * Check if a git tag exists for this version
+ * @param {string} version
+ * @returns {boolean}
+ */
+function checkTagExists(version) {
   try {
-    const changesetDir = '.changeset';
-    const files = readdirSync(changesetDir);
-    return files.filter((f) => f.endsWith('.md') && f !== 'README.md').length;
+    exec(`git rev-parse v${version}`, { stdio: 'ignore' });
+    return true;
   } catch {
-    return 0;
+    return false;
   }
 }
 
 /**
- * Get package version
- * @param {string} source - 'local' or 'remote'
+ * Strip frontmatter from markdown content
+ * @param {string} content - Markdown content potentially with frontmatter
+ * @returns {string} - Content without frontmatter
  */
-async function getVersion(source = 'local') {
-  if (source === 'remote') {
-    const result = await $`git show origin/main:package.json`.run({
-      capture: true,
-    });
-    return JSON.parse(result.stdout).version;
+function stripFrontmatter(content) {
+  const frontmatterMatch = content.match(/^---\s*\n[\s\S]*?\n---\s*\n([\s\S]*)$/);
+  if (frontmatterMatch) {
+    return frontmatterMatch[1].trim();
   }
-  return JSON.parse(readFileSync('./package.json', 'utf8')).version;
+  return content.trim();
 }
 
-async function main() {
+/**
+ * Collect changelog fragments and update CHANGELOG.md
+ * @param {string} version
+ */
+function collectChangelog(version) {
+  if (!existsSync(CHANGELOG_DIR)) {
+    return;
+  }
+
+  const files = readdirSync(CHANGELOG_DIR).filter(
+    (f) => f.endsWith('.md') && f !== 'README.md'
+  );
+
+  if (files.length === 0) {
+    return;
+  }
+
+  const fragments = files
+    .sort()
+    .map((f) => {
+      const rawContent = readFileSync(join(CHANGELOG_DIR, f), 'utf-8');
+      // Strip frontmatter (which contains bump type metadata)
+      return stripFrontmatter(rawContent);
+    })
+    .filter(Boolean)
+    .join('\n\n');
+
+  if (!fragments) {
+    return;
+  }
+
+  const dateStr = new Date().toISOString().split('T')[0];
+  const newEntry = `\n## [${version}] - ${dateStr}\n\n${fragments}\n`;
+
+  if (existsSync(CHANGELOG_FILE)) {
+    let content = readFileSync(CHANGELOG_FILE, 'utf-8');
+    const lines = content.split('\n');
+    let insertIndex = -1;
+
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].startsWith('## [')) {
+        insertIndex = i;
+        break;
+      }
+    }
+
+    if (insertIndex >= 0) {
+      lines.splice(insertIndex, 0, newEntry);
+      content = lines.join('\n');
+    } else {
+      content += newEntry;
+    }
+
+    writeFileSync(CHANGELOG_FILE, content, 'utf-8');
+  }
+
+  console.log(`Collected ${files.length} changelog fragment(s)`);
+}
+
+function main() {
   try {
     // Configure git
-    await $`git config user.name "github-actions[bot]"`;
-    await $`git config user.email "github-actions[bot]@users.noreply.github.com"`;
+    exec('git config user.name "github-actions[bot]"');
+    exec('git config user.email "github-actions[bot]@users.noreply.github.com"');
 
-    // Check if remote main has advanced (handles re-runs after partial success)
-    console.log('Checking for remote changes...');
-    await $`git fetch origin main`;
+    const current = getCurrentVersion();
+    const newVersion = calculateNewVersion(current, bumpType);
 
-    const localHeadResult = await $`git rev-parse HEAD`.run({ capture: true });
-    const localHead = localHeadResult.stdout.trim();
-
-    const remoteHeadResult = await $`git rev-parse origin/main`.run({
-      capture: true,
-    });
-    const remoteHead = remoteHeadResult.stdout.trim();
-
-    if (localHead !== remoteHead) {
-      console.log(
-        `Remote main has advanced (local: ${localHead}, remote: ${remoteHead})`
-      );
-      console.log('This may indicate a previous attempt partially succeeded.');
-
-      // Check if the remote version is already the expected bump
-      const remoteVersion = await getVersion('remote');
-      console.log(`Remote version: ${remoteVersion}`);
-
-      // Check if there are changesets to process
-      const changesetCount = countChangesets();
-
-      if (changesetCount === 0) {
-        console.log('No changesets to process and remote has advanced.');
-        console.log(
-          'Assuming version bump was already completed in a previous attempt.'
-        );
-        setOutput('version_committed', 'false');
-        setOutput('already_released', 'true');
-        setOutput('new_version', remoteVersion);
-        return;
-      } else {
-        console.log('Rebasing on remote main to incorporate changes...');
-        await $`git rebase origin/main`;
-      }
+    // Check if this version was already released
+    if (checkTagExists(newVersion)) {
+      console.log(`Tag v${newVersion} already exists`);
+      setOutput('already_released', 'true');
+      setOutput('new_version', newVersion);
+      return;
     }
 
-    // Get current version before bump
-    const oldVersion = await getVersion();
-    console.log(`Current version: ${oldVersion}`);
+    // Update version in Cargo.toml
+    updateCargoToml(newVersion);
 
-    if (mode === 'instant') {
-      console.log('Running instant version bump...');
-      // Run instant version bump script
-      // Rely on command-stream's auto-quoting for proper argument handling
-      if (description) {
-        await $`node scripts/instant-version-bump.mjs --bump-type ${bumpType} --description ${description}`;
-      } else {
-        await $`node scripts/instant-version-bump.mjs --bump-type ${bumpType}`;
-      }
-    } else {
-      console.log('Running changeset version...');
-      // Run changeset version to bump versions and update CHANGELOG
-      await $`npm run changeset:version`;
+    // Collect changelog fragments
+    collectChangelog(newVersion);
+
+    // Stage Cargo.toml and CHANGELOG.md
+    // Use the paths determined by rust-root configuration
+    exec(`git add ${CARGO_TOML}`);
+    if (existsSync(CHANGELOG_FILE)) {
+      exec(`git add ${CHANGELOG_FILE}`);
     }
-
-    // Get new version after bump
-    const newVersion = await getVersion();
-    console.log(`New version: ${newVersion}`);
-    setOutput('new_version', newVersion);
 
     // Check if there are changes to commit
-    const statusResult = await $`git status --porcelain`.run({ capture: true });
-    const status = statusResult.stdout.trim();
-
-    if (status) {
-      console.log('Changes detected, committing...');
-
-      // Stage all changes (package.json, package-lock.json, CHANGELOG.md, deleted changesets)
-      await $`git add -A`;
-
-      // Commit with version number as message
-      const commitMessage = newVersion;
-      const escapedMessage = commitMessage.replace(/"/g, '\\"');
-      await $`git commit -m "${escapedMessage}"`;
-
-      // Push directly to main
-      await $`git push origin main`;
-
-      console.log('\u2705 Version bump committed and pushed to main');
-      setOutput('version_committed', 'true');
-    } else {
+    try {
+      exec('git diff --cached --quiet', { stdio: 'ignore' });
+      // No changes to commit
       console.log('No changes to commit');
       setOutput('version_committed', 'false');
+      setOutput('new_version', newVersion);
+      return;
+    } catch {
+      // There are changes to commit (git diff exits with 1 when there are differences)
     }
+
+    // Commit changes
+    const commitMsg = description
+      ? `chore: release v${newVersion}\n\n${description}`
+      : `chore: release v${newVersion}`;
+    exec(`git commit -m "${commitMsg.replace(/"/g, '\\"')}"`);
+    console.log(`Committed version ${newVersion}`);
+
+    // Create tag
+    const tagMsg = description
+      ? `Release v${newVersion}\n\n${description}`
+      : `Release v${newVersion}`;
+    exec(`git tag -a v${newVersion} -m "${tagMsg.replace(/"/g, '\\"')}"`);
+    console.log(`Created tag v${newVersion}`);
+
+    // Push changes and tag
+    exec('git push');
+    exec('git push --tags');
+    console.log('Pushed changes and tags');
+
+    setOutput('version_committed', 'true');
+    setOutput('new_version', newVersion);
   } catch (error) {
     console.error('Error:', error.message);
     process.exit(1);
