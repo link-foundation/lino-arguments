@@ -16,11 +16,12 @@
 //!
 //! # Drop-in Replacement for clap
 //!
-//! Use `lino_arguments::Parser` instead of `clap::Parser` — everything else
-//! stays the same. Call `Args::parse()` and `.lenv`/`.env` files are loaded
-//! automatically:
+//! Just replace `use clap::Parser` with `use lino_arguments::Parser` —
+//! everything else stays exactly the same. `.lenv` and `.env` files are
+//! loaded automatically at startup before `main()` runs:
 //!
 //! ```rust,ignore
+//! // Only change: import from lino_arguments instead of clap
 //! use lino_arguments::Parser;
 //!
 //! #[derive(Parser, Debug)]
@@ -37,7 +38,7 @@
 //! }
 //!
 //! fn main() {
-//!     let args = Args::parse();
+//!     let args = Args::parse(); // .lenv + .env already loaded
 //!     println!("port = {}", args.port);
 //! }
 //! ```
@@ -74,8 +75,10 @@ use std::env;
 use thiserror::Error;
 
 // Re-export clap's Parser (derive macro + trait) so that `#[derive(Parser)]`
-// and `Args::parse()` work out of the box. Users import `lino_arguments::Parser`
-// as a drop-in replacement for `clap::Parser`.
+// and `Args::parse()` work as a true drop-in replacement for clap.
+// The .lenv/.env files are loaded automatically at startup via the `ctor` crate,
+// so `Args::parse()` sees the environment variables from these files without
+// any extra `init()` call.
 pub use clap::Parser;
 pub use clap::{Args, Subcommand, ValueEnum};
 
@@ -109,8 +112,20 @@ pub enum ConfigError {
 }
 
 // ============================================================================
-// LinoParser Trait — drop-in replacement for clap::Parser
+// Auto-initialization via ctor
 // ============================================================================
+
+/// Automatically load `.lenv` and `.env` files at program startup.
+///
+/// This runs before `main()`, so by the time `Args::parse()` is called,
+/// all values from `.lenv` and `.env` are already in the process environment.
+/// This is what makes the drop-in replacement work: just change the import
+/// from `use clap::Parser` to `use lino_arguments::Parser` and everything
+/// else stays the same.
+#[ctor::ctor]
+fn auto_init() {
+    init();
+}
 
 // ============================================================================
 // init() — Load .lenv and .env files into the process environment
@@ -118,25 +133,12 @@ pub enum ConfigError {
 
 /// Load `.lenv` and `.env` files into the process environment.
 ///
-/// Call this before `Args::parse()` to get the full priority chain:
-/// CLI args > env vars > `.lenv` > `.env` > `default_value`.
+/// Loads `.lenv` first (higher priority), then `.env` (lower priority).
+/// Neither overwrites existing environment variables.
 ///
-/// This is the recommended approach for a true drop-in clap replacement:
-///
-/// ```rust,ignore
-/// use lino_arguments::Parser;
-///
-/// #[derive(Parser, Debug)]
-/// struct Args {
-///     #[arg(long, env = "PORT", default_value = "3000")]
-///     port: u16,
-/// }
-///
-/// fn main() {
-///     lino_arguments::init();   // loads .lenv + .env into process env
-///     let args = Args::parse(); // standard clap API — no changes needed
-/// }
-/// ```
+/// This is called automatically at program startup. You only need to call
+/// it manually if you want to reload files after the program has started,
+/// or if you're using [`init_with()`] with custom paths.
 pub fn init() {
     load_lenv_file(".lenv").ok();
     load_env_file(".env").ok();
@@ -147,7 +149,7 @@ pub fn init() {
 /// Like [`init()`], but with custom file paths.
 ///
 /// ```rust,ignore
-/// lino_arguments::init_with(Some(".lenv"), Some(".env.local"));
+/// lino_arguments::init_with(Some("config/app.lenv"), Some(".env.local"));
 /// let args = Args::parse();
 /// ```
 pub fn init_with(lenv_path: Option<&str>, env_path: Option<&str>) {
@@ -160,23 +162,19 @@ pub fn init_with(lenv_path: Option<&str>, env_path: Option<&str>) {
 }
 
 // ============================================================================
-// LinoParser Trait — convenience extension for clap::Parser
+// LinoParser Trait — convenience extension for custom file paths
 // ============================================================================
 
-/// Extension trait for clap's `Parser` that combines `.lenv`/`.env` loading
-/// with CLI argument parsing in a single call.
+/// Extension trait for `clap::Parser` that provides methods for parsing
+/// with custom `.lenv`/`.env` file paths.
 ///
-/// Automatically implemented for any type that derives `clap::Parser`.
+/// Automatically implemented for any type that derives `Parser`.
 ///
-/// # Priority (highest to lowest)
+/// For standard usage, you don't need this trait at all — just use
+/// `Args::parse()` directly and `.lenv`/`.env` files are loaded
+/// automatically at startup.
 ///
-/// 1. CLI arguments (`--port 8080`)
-/// 2. Environment variables already set in the process
-/// 3. Values from `.lenv` file (loaded into env, won't overwrite existing)
-/// 4. Values from `.env` file (loaded into env, won't overwrite existing)
-/// 5. `default_value` from the `#[arg(...)]` attribute
-///
-/// # Example
+/// Use `LinoParser` methods only when you need custom file paths:
 ///
 /// ```rust,ignore
 /// use lino_arguments::{Parser, LinoParser};
@@ -187,15 +185,17 @@ pub fn init_with(lenv_path: Option<&str>, env_path: Option<&str>) {
 ///     port: u16,
 /// }
 ///
-/// // Option 1: init() + standard parse() (recommended drop-in)
-/// lino_arguments::init();
+/// // Standard usage — just parse(), .lenv/.env already loaded:
 /// let args = Args::parse();
 ///
-/// // Option 2: lino_parse() one-liner
-/// let args = Args::lino_parse();
+/// // Custom file paths:
+/// let args = Args::lino_parse_from_with(
+///     ["app"], Some("custom.lenv"), Some("custom.env")
+/// );
 /// ```
 pub trait LinoParser: Parser {
     /// Parse CLI arguments after loading `.lenv` and `.env` files.
+    /// Equivalent to `Args::parse()` (since auto-init already loads files).
     fn lino_parse() -> Self {
         init();
         <Self as Parser>::parse()

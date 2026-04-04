@@ -1,9 +1,8 @@
 //! Struct-based configuration example (drop-in clap replacement)
 //!
-//! This shows how lino-arguments works as a drop-in replacement for clap,
+//! This shows how lino-arguments works as a true drop-in replacement for clap,
 //! with built-in .lenv and .env file support. Just replace `use clap::Parser`
-//! with `use lino_arguments::Parser` and add `lino_arguments::init()` —
-//! everything else stays the same.
+//! with `use lino_arguments::Parser` — everything else stays the same.
 //!
 //! Usage:
 //!   cargo run --example struct_based -- --port 9090 --verbose
@@ -12,13 +11,14 @@
 //! With a .lenv file containing "PORT: 8080":
 //!   cargo run --example struct_based
 
+// Only change from clap: import from lino_arguments instead of clap
 use lino_arguments::Parser;
 
 /// A simple web server configuration.
 ///
-/// Uses standard clap attributes — `lino_arguments::init()` loads .lenv
-/// and .env files into the process environment before clap parses, so
-/// `env = "PORT"` automatically picks up values from .lenv/.env files.
+/// Uses standard clap attributes — lino-arguments automatically loads .lenv
+/// and .env files into the process environment at startup, so `env = "PORT"`
+/// picks up values from .lenv/.env files without any extra code.
 #[derive(Parser, Debug)]
 #[command(name = "my-server")]
 #[command(about = "A web server with unified configuration")]
@@ -42,8 +42,7 @@ struct Args {
 }
 
 fn main() {
-    // Drop-in: just add init() before parse()
-    lino_arguments::init();
+    // No init() needed — .lenv and .env are loaded automatically
     let args = Args::parse();
 
     // If --configuration was provided, load that .lenv file too
