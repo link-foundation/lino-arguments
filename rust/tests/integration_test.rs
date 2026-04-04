@@ -459,148 +459,169 @@ mod clap_reexport {
 mod lino_parser_tests {
     use super::*;
 
-    #[derive(Parser, Debug)]
-    #[command(name = "test-lino-parser")]
-    struct TestArgs {
-        #[arg(long, env = "LINO_TEST_LP_PORT", default_value = "3000")]
-        port: u16,
-
-        #[arg(long, env = "LINO_TEST_LP_HOST", default_value = "localhost")]
-        host: String,
-
-        #[arg(long, env = "LINO_TEST_LP_VERBOSE")]
-        verbose: bool,
-    }
+    // Each test uses a unique struct with unique env var names to avoid
+    // interference when tests run in parallel (sharing process env).
 
     #[test]
     fn test_lino_parse_from_with_lenv_file() {
+        #[derive(Parser, Debug)]
+        #[command(name = "test")]
+        struct Args {
+            #[arg(long, env = "LP_LENV_PORT_T1", default_value = "3000")]
+            port: u16,
+            #[arg(long, env = "LP_LENV_HOST_T1", default_value = "localhost")]
+            host: String,
+            #[arg(long, env = "LP_LENV_VERBOSE_T1")]
+            verbose: bool,
+        }
+
         let dir = tempdir().unwrap();
         let lenv_path = dir.path().join("test.lenv");
         let lenv_path_str = lenv_path.to_str().unwrap();
 
-        // Write .lenv file with PORT value
-        fs::write(&lenv_path, "LINO_TEST_LP_PORT: 8080\n").unwrap();
+        fs::write(&lenv_path, "LP_LENV_PORT_T1: 8080\n").unwrap();
+        env::remove_var("LP_LENV_PORT_T1");
 
-        // Ensure env var doesn't exist
-        env::remove_var("LINO_TEST_LP_PORT");
+        let args = Args::lino_parse_from_with(["test"], Some(lenv_path_str), None);
 
-        // Use lino_parse_from_with to load the .lenv file and parse
-        let args = TestArgs::lino_parse_from_with(["test-lino-parser"], Some(lenv_path_str), None);
-
-        // .lenv value should be picked up via env
         assert_eq!(args.port, 8080);
-        assert_eq!(args.host, "localhost"); // default
-        assert!(!args.verbose); // default
+        assert_eq!(args.host, "localhost");
+        assert!(!args.verbose);
 
-        env::remove_var("LINO_TEST_LP_PORT");
+        env::remove_var("LP_LENV_PORT_T1");
     }
 
     #[test]
     fn test_lino_parse_from_with_env_file() {
+        #[derive(Parser, Debug)]
+        #[command(name = "test")]
+        struct Args {
+            #[arg(long, env = "LP_ENV_HOST_T2", default_value = "localhost")]
+            host: String,
+            #[arg(long, env = "LP_ENV_PORT_T2", default_value = "3000")]
+            port: u16,
+        }
+
         let dir = tempdir().unwrap();
         let env_path = dir.path().join(".env");
         let env_path_str = env_path.to_str().unwrap();
 
-        // Write .env file with HOST value
-        fs::write(&env_path, "LINO_TEST_LP_HOST=example.com\n").unwrap();
+        fs::write(&env_path, "LP_ENV_HOST_T2=example.com\n").unwrap();
+        env::remove_var("LP_ENV_HOST_T2");
+        env::remove_var("LP_ENV_PORT_T2");
 
-        env::remove_var("LINO_TEST_LP_HOST");
-
-        let args = TestArgs::lino_parse_from_with(["test-lino-parser"], None, Some(env_path_str));
+        let args = Args::lino_parse_from_with(["test"], None, Some(env_path_str));
 
         assert_eq!(args.host, "example.com");
-        assert_eq!(args.port, 3000); // default
+        assert_eq!(args.port, 3000);
 
-        env::remove_var("LINO_TEST_LP_HOST");
+        env::remove_var("LP_ENV_HOST_T2");
     }
 
     #[test]
     fn test_lino_parse_cli_overrides_lenv() {
+        #[derive(Parser, Debug)]
+        #[command(name = "test")]
+        struct Args {
+            #[arg(long, env = "LP_CLI_PORT_T3", default_value = "3000")]
+            port: u16,
+        }
+
         let dir = tempdir().unwrap();
         let lenv_path = dir.path().join("test.lenv");
         let lenv_path_str = lenv_path.to_str().unwrap();
 
-        fs::write(&lenv_path, "LINO_TEST_LP_PORT: 8080\n").unwrap();
-        env::remove_var("LINO_TEST_LP_PORT");
+        fs::write(&lenv_path, "LP_CLI_PORT_T3: 8080\n").unwrap();
+        env::remove_var("LP_CLI_PORT_T3");
 
-        // CLI --port should override .lenv value
-        let args = TestArgs::lino_parse_from_with(
-            ["test-lino-parser", "--port", "9999"],
-            Some(lenv_path_str),
-            None,
-        );
+        let args =
+            Args::lino_parse_from_with(["test", "--port", "9999"], Some(lenv_path_str), None);
 
         assert_eq!(args.port, 9999);
 
-        env::remove_var("LINO_TEST_LP_PORT");
+        env::remove_var("LP_CLI_PORT_T3");
     }
 
     #[test]
     fn test_lino_parse_env_var_overrides_lenv() {
+        #[derive(Parser, Debug)]
+        #[command(name = "test")]
+        struct Args {
+            #[arg(long, env = "LP_ENVOV_PORT_T4", default_value = "3000")]
+            port: u16,
+        }
+
         let dir = tempdir().unwrap();
         let lenv_path = dir.path().join("test.lenv");
         let lenv_path_str = lenv_path.to_str().unwrap();
 
-        fs::write(&lenv_path, "LINO_TEST_LP_PORT: 8080\n").unwrap();
+        fs::write(&lenv_path, "LP_ENVOV_PORT_T4: 8080\n").unwrap();
 
         // Set env var BEFORE loading .lenv — env var should take priority
-        env::set_var("LINO_TEST_LP_PORT", "7070");
+        env::set_var("LP_ENVOV_PORT_T4", "7070");
 
-        let args = TestArgs::lino_parse_from_with(["test-lino-parser"], Some(lenv_path_str), None);
+        let args = Args::lino_parse_from_with(["test"], Some(lenv_path_str), None);
 
-        // env var (7070) should win over .lenv (8080) because load_lenv_file
-        // does NOT overwrite existing env vars
         assert_eq!(args.port, 7070);
 
-        env::remove_var("LINO_TEST_LP_PORT");
+        env::remove_var("LP_ENVOV_PORT_T4");
     }
 
     #[test]
     fn test_lino_parse_lenv_overrides_env_file() {
+        #[derive(Parser, Debug)]
+        #[command(name = "test")]
+        struct Args {
+            #[arg(long, env = "LP_LENVOV_PORT_T5", default_value = "3000")]
+            port: u16,
+        }
+
         let dir = tempdir().unwrap();
         let lenv_path = dir.path().join("test.lenv");
         let lenv_path_str = lenv_path.to_str().unwrap();
         let env_path = dir.path().join(".env");
         let env_path_str = env_path.to_str().unwrap();
 
-        // .lenv has port 8080, .env has port 5050
-        fs::write(&lenv_path, "LINO_TEST_LP_PORT: 8080\n").unwrap();
-        fs::write(&env_path, "LINO_TEST_LP_PORT=5050\n").unwrap();
+        fs::write(&lenv_path, "LP_LENVOV_PORT_T5: 8080\n").unwrap();
+        fs::write(&env_path, "LP_LENVOV_PORT_T5=5050\n").unwrap();
 
-        env::remove_var("LINO_TEST_LP_PORT");
+        env::remove_var("LP_LENVOV_PORT_T5");
 
-        // .lenv is loaded first, so it sets the env var; .env won't overwrite
-        let args = TestArgs::lino_parse_from_with(
-            ["test-lino-parser"],
-            Some(lenv_path_str),
-            Some(env_path_str),
-        );
+        let args = Args::lino_parse_from_with(["test"], Some(lenv_path_str), Some(env_path_str));
 
         assert_eq!(args.port, 8080); // .lenv wins over .env
 
-        env::remove_var("LINO_TEST_LP_PORT");
+        env::remove_var("LP_LENVOV_PORT_T5");
     }
 
     #[test]
     fn test_lino_parse_full_priority_chain() {
-        // Test the full priority: CLI > env var > .lenv > .env > default
+        #[derive(Parser, Debug)]
+        #[command(name = "test")]
+        struct Args {
+            #[arg(long, env = "LP_FPC_PORT_T6", default_value = "3000")]
+            port: u16,
+            #[arg(long, env = "LP_FPC_HOST_T6", default_value = "localhost")]
+            host: String,
+            #[arg(long, env = "LP_FPC_VERBOSE_T6")]
+            verbose: bool,
+        }
+
         let dir = tempdir().unwrap();
         let lenv_path = dir.path().join("test.lenv");
         let lenv_path_str = lenv_path.to_str().unwrap();
         let env_path = dir.path().join(".env");
         let env_path_str = env_path.to_str().unwrap();
 
-        // Setup: .lenv has host, .env has verbose flag value
-        fs::write(&lenv_path, "LINO_TEST_LP_HOST: from-lenv\n").unwrap();
-        fs::write(&env_path, "LINO_TEST_LP_VERBOSE=true\n").unwrap();
+        fs::write(&lenv_path, "LP_FPC_HOST_T6: from-lenv\n").unwrap();
+        fs::write(&env_path, "LP_FPC_VERBOSE_T6=true\n").unwrap();
 
-        env::remove_var("LINO_TEST_LP_PORT");
-        env::remove_var("LINO_TEST_LP_HOST");
-        env::remove_var("LINO_TEST_LP_VERBOSE");
+        env::remove_var("LP_FPC_PORT_T6");
+        env::remove_var("LP_FPC_HOST_T6");
+        env::remove_var("LP_FPC_VERBOSE_T6");
 
-        // CLI overrides port, .lenv provides host, .env provides verbose
-        let args = TestArgs::lino_parse_from_with(
-            ["test-lino-parser", "--port", "4000"],
+        let args = Args::lino_parse_from_with(
+            ["test", "--port", "4000"],
             Some(lenv_path_str),
             Some(env_path_str),
         );
@@ -609,17 +630,28 @@ mod lino_parser_tests {
         assert_eq!(args.host, "from-lenv"); // from .lenv
         assert!(args.verbose); // from .env
 
-        env::remove_var("LINO_TEST_LP_HOST");
-        env::remove_var("LINO_TEST_LP_VERBOSE");
+        env::remove_var("LP_FPC_HOST_T6");
+        env::remove_var("LP_FPC_VERBOSE_T6");
     }
 
     #[test]
     fn test_lino_parse_defaults_when_no_files() {
-        env::remove_var("LINO_TEST_LP_PORT");
-        env::remove_var("LINO_TEST_LP_HOST");
-        env::remove_var("LINO_TEST_LP_VERBOSE");
+        #[derive(Parser, Debug)]
+        #[command(name = "test")]
+        struct Args {
+            #[arg(long, env = "LP_DEF_PORT_T7", default_value = "3000")]
+            port: u16,
+            #[arg(long, env = "LP_DEF_HOST_T7", default_value = "localhost")]
+            host: String,
+            #[arg(long, env = "LP_DEF_VERBOSE_T7")]
+            verbose: bool,
+        }
 
-        let args = TestArgs::lino_parse_from_with(["test-lino-parser"], None, None);
+        env::remove_var("LP_DEF_PORT_T7");
+        env::remove_var("LP_DEF_HOST_T7");
+        env::remove_var("LP_DEF_VERBOSE_T7");
+
+        let args = Args::lino_parse_from_with(["test"], None, None);
 
         assert_eq!(args.port, 3000);
         assert_eq!(args.host, "localhost");
@@ -731,18 +763,18 @@ mod make_config_tests {
         let file_path = dir.path().join("test_make_config.lenv");
         let file_path_str = file_path.to_str().unwrap();
 
-        fs::write(&file_path, "PORT: 7070\n").unwrap();
+        fs::write(&file_path, "MC_LENV_PORT: 7070\n").unwrap();
 
-        // Ensure env var doesn't exist
-        env::remove_var("PORT");
+        env::remove_var("MC_LENV_PORT");
 
         let config = make_config_from(["app"], |c| {
-            c.lenv(file_path_str).option("port", "Server port", "3000")
+            c.lenv(file_path_str)
+                .option("mc-lenv-port", "Server port", "3000")
         });
 
-        assert_eq!(config.get("port"), "7070");
+        assert_eq!(config.get("mcLenvPort"), "7070");
 
-        env::remove_var("PORT");
+        env::remove_var("MC_LENV_PORT");
     }
 
     #[test]
@@ -751,17 +783,18 @@ mod make_config_tests {
         let file_path = dir.path().join(".env");
         let file_path_str = file_path.to_str().unwrap();
 
-        fs::write(&file_path, "PORT=6060\n").unwrap();
+        fs::write(&file_path, "MC_ENV_PORT=6060\n").unwrap();
 
-        env::remove_var("PORT");
+        env::remove_var("MC_ENV_PORT");
 
         let config = make_config_from(["app"], |c| {
-            c.env(file_path_str).option("port", "Server port", "3000")
+            c.env(file_path_str)
+                .option("mc-env-port", "Server port", "3000")
         });
 
-        assert_eq!(config.get("port"), "6060");
+        assert_eq!(config.get("mcEnvPort"), "6060");
 
-        env::remove_var("PORT");
+        env::remove_var("MC_ENV_PORT");
     }
 
     #[test]
@@ -772,21 +805,21 @@ mod make_config_tests {
         let env_path = dir.path().join(".env");
         let env_path_str = env_path.to_str().unwrap();
 
-        fs::write(&lenv_path, "MAKE_CFG_PORT: 8080\n").unwrap();
-        fs::write(&env_path, "MAKE_CFG_PORT=5050\n").unwrap();
+        fs::write(&lenv_path, "MC_LENVOV_PORT: 8080\n").unwrap();
+        fs::write(&env_path, "MC_LENVOV_PORT=5050\n").unwrap();
 
-        env::remove_var("MAKE_CFG_PORT");
+        env::remove_var("MC_LENVOV_PORT");
 
         let config = make_config_from(["app"], |c| {
             c.lenv(lenv_path_str)
                 .env(env_path_str)
-                .option("make-cfg-port", "Port", "3000")
+                .option("mc-lenvov-port", "Port", "3000")
         });
 
         // .lenv should win over .env
-        assert_eq!(config.get("makeCfgPort"), "8080");
+        assert_eq!(config.get("mcLenvovPort"), "8080");
 
-        env::remove_var("MAKE_CFG_PORT");
+        env::remove_var("MC_LENVOV_PORT");
     }
 
     #[test]
@@ -795,19 +828,19 @@ mod make_config_tests {
         let file_path = dir.path().join("test_override.lenv");
         let file_path_str = file_path.to_str().unwrap();
 
-        fs::write(&file_path, "PORT: 7070\n").unwrap();
+        fs::write(&file_path, "MC_CLIOV_PORT: 7070\n").unwrap();
 
-        // Ensure env var doesn't exist
-        env::remove_var("PORT");
+        env::remove_var("MC_CLIOV_PORT");
 
-        let config = make_config_from(["app", "--port", "9999"], |c| {
-            c.lenv(file_path_str).option("port", "Server port", "3000")
+        let config = make_config_from(["app", "--mc-cliov-port", "9999"], |c| {
+            c.lenv(file_path_str)
+                .option("mc-cliov-port", "Server port", "3000")
         });
 
         // CLI should override .lenv value
-        assert_eq!(config.get("port"), "9999");
+        assert_eq!(config.get("mcCliovPort"), "9999");
 
-        env::remove_var("PORT");
+        env::remove_var("MC_CLIOV_PORT");
     }
 
     #[test]
