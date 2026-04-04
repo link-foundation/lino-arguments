@@ -1,9 +1,9 @@
 //! Integration tests for lino-arguments
 
 use lino_arguments::{
-    getenv, getenv_bool, getenv_int, load_lenv_file, load_lenv_file_override, make_config_from,
-    read_lino_env, to_camel_case, to_kebab_case, to_pascal_case, to_snake_case, to_upper_case,
-    write_lino_env, LinoEnv, Parser,
+    getenv, getenv_bool, getenv_int, load_env_file, load_env_file_override, load_lenv_file,
+    load_lenv_file_override, make_config_from, read_lino_env, to_camel_case, to_kebab_case,
+    to_pascal_case, to_snake_case, to_upper_case, write_lino_env, LinoEnv, LinoParser, Parser,
 };
 use std::collections::HashMap;
 use std::env;
@@ -282,6 +282,112 @@ mod lenv_file_tests {
 }
 
 // ============================================================================
+// .env File Loading Tests
+// ============================================================================
+
+mod env_file_tests {
+    use super::*;
+
+    #[test]
+    fn test_load_env_file_sets_env_vars() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join(".env");
+        let file_path_str = file_path.to_str().unwrap();
+
+        // Write a standard .env file
+        fs::write(
+            &file_path,
+            "LINO_TEST_ENV_PORT=9090\nLINO_TEST_ENV_HOST=localhost\n",
+        )
+        .unwrap();
+
+        // Ensure env vars don't exist before loading
+        env::remove_var("LINO_TEST_ENV_PORT");
+        env::remove_var("LINO_TEST_ENV_HOST");
+
+        // Load the file
+        let loaded = load_env_file(file_path_str).unwrap();
+        assert_eq!(loaded, 2);
+
+        // Check env vars are set
+        assert_eq!(env::var("LINO_TEST_ENV_PORT").unwrap(), "9090");
+        assert_eq!(env::var("LINO_TEST_ENV_HOST").unwrap(), "localhost");
+
+        // Cleanup
+        env::remove_var("LINO_TEST_ENV_PORT");
+        env::remove_var("LINO_TEST_ENV_HOST");
+    }
+
+    #[test]
+    fn test_load_env_file_does_not_overwrite_existing() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join(".env");
+        let file_path_str = file_path.to_str().unwrap();
+
+        fs::write(&file_path, "LINO_TEST_ENV_EXISTING=from_file\n").unwrap();
+
+        // Set the env var before loading
+        env::set_var("LINO_TEST_ENV_EXISTING", "from_env");
+
+        let loaded = load_env_file(file_path_str).unwrap();
+        assert_eq!(loaded, 0);
+
+        assert_eq!(env::var("LINO_TEST_ENV_EXISTING").unwrap(), "from_env");
+
+        env::remove_var("LINO_TEST_ENV_EXISTING");
+    }
+
+    #[test]
+    fn test_load_env_file_override_overwrites() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join(".env");
+        let file_path_str = file_path.to_str().unwrap();
+
+        fs::write(&file_path, "LINO_TEST_ENV_OVERRIDE=from_file\n").unwrap();
+
+        env::set_var("LINO_TEST_ENV_OVERRIDE", "from_env");
+
+        let loaded = load_env_file_override(file_path_str).unwrap();
+        assert_eq!(loaded, 1);
+
+        assert_eq!(env::var("LINO_TEST_ENV_OVERRIDE").unwrap(), "from_file");
+
+        env::remove_var("LINO_TEST_ENV_OVERRIDE");
+    }
+
+    #[test]
+    fn test_load_env_file_nonexistent_returns_ok() {
+        let result = load_env_file("/nonexistent/path/to/file.env");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0);
+    }
+
+    #[test]
+    fn test_load_env_file_quoted_values() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join(".env");
+        let file_path_str = file_path.to_str().unwrap();
+
+        fs::write(
+            &file_path,
+            "LINO_TEST_ENV_QUOTED=\"hello world\"\nLINO_TEST_ENV_SINGLE='single quotes'\n",
+        )
+        .unwrap();
+
+        env::remove_var("LINO_TEST_ENV_QUOTED");
+        env::remove_var("LINO_TEST_ENV_SINGLE");
+
+        load_env_file(file_path_str).unwrap();
+
+        assert_eq!(env::var("LINO_TEST_ENV_QUOTED").unwrap(), "hello world");
+        assert_eq!(env::var("LINO_TEST_ENV_SINGLE").unwrap(), "single quotes");
+
+        env::remove_var("LINO_TEST_ENV_QUOTED");
+        env::remove_var("LINO_TEST_ENV_SINGLE");
+    }
+}
+
+// ============================================================================
 // Integration Tests - getenv with lenv file
 // ============================================================================
 
@@ -342,6 +448,181 @@ mod clap_reexport {
     fn test_parser_defaults_work() {
         let args = TestArgs::parse_from(["test-app"]);
         assert_eq!(args.port, "3000");
+        assert!(!args.verbose);
+    }
+}
+
+// ============================================================================
+// LinoParser Trait Tests
+// ============================================================================
+
+mod lino_parser_tests {
+    use super::*;
+
+    #[derive(Parser, Debug)]
+    #[command(name = "test-lino-parser")]
+    struct TestArgs {
+        #[arg(long, env = "LINO_TEST_LP_PORT", default_value = "3000")]
+        port: u16,
+
+        #[arg(long, env = "LINO_TEST_LP_HOST", default_value = "localhost")]
+        host: String,
+
+        #[arg(long, env = "LINO_TEST_LP_VERBOSE")]
+        verbose: bool,
+    }
+
+    #[test]
+    fn test_lino_parse_from_with_lenv_file() {
+        let dir = tempdir().unwrap();
+        let lenv_path = dir.path().join("test.lenv");
+        let lenv_path_str = lenv_path.to_str().unwrap();
+
+        // Write .lenv file with PORT value
+        fs::write(&lenv_path, "LINO_TEST_LP_PORT: 8080\n").unwrap();
+
+        // Ensure env var doesn't exist
+        env::remove_var("LINO_TEST_LP_PORT");
+
+        // Use lino_parse_from_with to load the .lenv file and parse
+        let args = TestArgs::lino_parse_from_with(["test-lino-parser"], Some(lenv_path_str), None);
+
+        // .lenv value should be picked up via env
+        assert_eq!(args.port, 8080);
+        assert_eq!(args.host, "localhost"); // default
+        assert!(!args.verbose); // default
+
+        env::remove_var("LINO_TEST_LP_PORT");
+    }
+
+    #[test]
+    fn test_lino_parse_from_with_env_file() {
+        let dir = tempdir().unwrap();
+        let env_path = dir.path().join(".env");
+        let env_path_str = env_path.to_str().unwrap();
+
+        // Write .env file with HOST value
+        fs::write(&env_path, "LINO_TEST_LP_HOST=example.com\n").unwrap();
+
+        env::remove_var("LINO_TEST_LP_HOST");
+
+        let args = TestArgs::lino_parse_from_with(["test-lino-parser"], None, Some(env_path_str));
+
+        assert_eq!(args.host, "example.com");
+        assert_eq!(args.port, 3000); // default
+
+        env::remove_var("LINO_TEST_LP_HOST");
+    }
+
+    #[test]
+    fn test_lino_parse_cli_overrides_lenv() {
+        let dir = tempdir().unwrap();
+        let lenv_path = dir.path().join("test.lenv");
+        let lenv_path_str = lenv_path.to_str().unwrap();
+
+        fs::write(&lenv_path, "LINO_TEST_LP_PORT: 8080\n").unwrap();
+        env::remove_var("LINO_TEST_LP_PORT");
+
+        // CLI --port should override .lenv value
+        let args = TestArgs::lino_parse_from_with(
+            ["test-lino-parser", "--port", "9999"],
+            Some(lenv_path_str),
+            None,
+        );
+
+        assert_eq!(args.port, 9999);
+
+        env::remove_var("LINO_TEST_LP_PORT");
+    }
+
+    #[test]
+    fn test_lino_parse_env_var_overrides_lenv() {
+        let dir = tempdir().unwrap();
+        let lenv_path = dir.path().join("test.lenv");
+        let lenv_path_str = lenv_path.to_str().unwrap();
+
+        fs::write(&lenv_path, "LINO_TEST_LP_PORT: 8080\n").unwrap();
+
+        // Set env var BEFORE loading .lenv — env var should take priority
+        env::set_var("LINO_TEST_LP_PORT", "7070");
+
+        let args = TestArgs::lino_parse_from_with(["test-lino-parser"], Some(lenv_path_str), None);
+
+        // env var (7070) should win over .lenv (8080) because load_lenv_file
+        // does NOT overwrite existing env vars
+        assert_eq!(args.port, 7070);
+
+        env::remove_var("LINO_TEST_LP_PORT");
+    }
+
+    #[test]
+    fn test_lino_parse_lenv_overrides_env_file() {
+        let dir = tempdir().unwrap();
+        let lenv_path = dir.path().join("test.lenv");
+        let lenv_path_str = lenv_path.to_str().unwrap();
+        let env_path = dir.path().join(".env");
+        let env_path_str = env_path.to_str().unwrap();
+
+        // .lenv has port 8080, .env has port 5050
+        fs::write(&lenv_path, "LINO_TEST_LP_PORT: 8080\n").unwrap();
+        fs::write(&env_path, "LINO_TEST_LP_PORT=5050\n").unwrap();
+
+        env::remove_var("LINO_TEST_LP_PORT");
+
+        // .lenv is loaded first, so it sets the env var; .env won't overwrite
+        let args = TestArgs::lino_parse_from_with(
+            ["test-lino-parser"],
+            Some(lenv_path_str),
+            Some(env_path_str),
+        );
+
+        assert_eq!(args.port, 8080); // .lenv wins over .env
+
+        env::remove_var("LINO_TEST_LP_PORT");
+    }
+
+    #[test]
+    fn test_lino_parse_full_priority_chain() {
+        // Test the full priority: CLI > env var > .lenv > .env > default
+        let dir = tempdir().unwrap();
+        let lenv_path = dir.path().join("test.lenv");
+        let lenv_path_str = lenv_path.to_str().unwrap();
+        let env_path = dir.path().join(".env");
+        let env_path_str = env_path.to_str().unwrap();
+
+        // Setup: .lenv has host, .env has verbose flag value
+        fs::write(&lenv_path, "LINO_TEST_LP_HOST: from-lenv\n").unwrap();
+        fs::write(&env_path, "LINO_TEST_LP_VERBOSE=true\n").unwrap();
+
+        env::remove_var("LINO_TEST_LP_PORT");
+        env::remove_var("LINO_TEST_LP_HOST");
+        env::remove_var("LINO_TEST_LP_VERBOSE");
+
+        // CLI overrides port, .lenv provides host, .env provides verbose
+        let args = TestArgs::lino_parse_from_with(
+            ["test-lino-parser", "--port", "4000"],
+            Some(lenv_path_str),
+            Some(env_path_str),
+        );
+
+        assert_eq!(args.port, 4000); // from CLI
+        assert_eq!(args.host, "from-lenv"); // from .lenv
+        assert!(args.verbose); // from .env
+
+        env::remove_var("LINO_TEST_LP_HOST");
+        env::remove_var("LINO_TEST_LP_VERBOSE");
+    }
+
+    #[test]
+    fn test_lino_parse_defaults_when_no_files() {
+        env::remove_var("LINO_TEST_LP_PORT");
+        env::remove_var("LINO_TEST_LP_HOST");
+        env::remove_var("LINO_TEST_LP_VERBOSE");
+
+        let args = TestArgs::lino_parse_from_with(["test-lino-parser"], None, None);
+
+        assert_eq!(args.port, 3000);
+        assert_eq!(args.host, "localhost");
         assert!(!args.verbose);
     }
 }
@@ -462,6 +743,50 @@ mod make_config_tests {
         assert_eq!(config.get("port"), "7070");
 
         env::remove_var("PORT");
+    }
+
+    #[test]
+    fn test_make_config_with_env_file() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join(".env");
+        let file_path_str = file_path.to_str().unwrap();
+
+        fs::write(&file_path, "PORT=6060\n").unwrap();
+
+        env::remove_var("PORT");
+
+        let config = make_config_from(["app"], |c| {
+            c.env(file_path_str).option("port", "Server port", "3000")
+        });
+
+        assert_eq!(config.get("port"), "6060");
+
+        env::remove_var("PORT");
+    }
+
+    #[test]
+    fn test_make_config_lenv_overrides_env_file() {
+        let dir = tempdir().unwrap();
+        let lenv_path = dir.path().join("test.lenv");
+        let lenv_path_str = lenv_path.to_str().unwrap();
+        let env_path = dir.path().join(".env");
+        let env_path_str = env_path.to_str().unwrap();
+
+        fs::write(&lenv_path, "MAKE_CFG_PORT: 8080\n").unwrap();
+        fs::write(&env_path, "MAKE_CFG_PORT=5050\n").unwrap();
+
+        env::remove_var("MAKE_CFG_PORT");
+
+        let config = make_config_from(["app"], |c| {
+            c.lenv(lenv_path_str)
+                .env(env_path_str)
+                .option("make-cfg-port", "Port", "3000")
+        });
+
+        // .lenv should win over .env
+        assert_eq!(config.get("makeCfgPort"), "8080");
+
+        env::remove_var("MAKE_CFG_PORT");
     }
 
     #[test]

@@ -1,30 +1,38 @@
-//! Struct-based configuration example (like clap + dotenvy)
+//! Struct-based configuration example (drop-in clap replacement)
 //!
 //! This shows how lino-arguments works as a drop-in replacement for clap,
-//! with built-in .lenv file support instead of .env files.
+//! with built-in .lenv and .env file support. Just use `LinoParser` trait
+//! and clap's `env` attribute — .lenv/.env values are loaded automatically.
 //!
 //! Usage:
 //!   cargo run --example struct_based -- --port 9090 --verbose
 //!   PORT=8080 cargo run --example struct_based
+//!
+//! With a .lenv file containing "PORT: 8080":
+//!   cargo run --example struct_based
 
-use lino_arguments::{getenv, getenv_bool, getenv_int, load_lenv_file, Parser};
+use lino_arguments::{LinoParser, Parser};
 
-/// A simple web server configuration
+/// A simple web server configuration.
+///
+/// Uses standard clap attributes — `LinoParser::lino_parse()` loads .lenv
+/// and .env files into the process environment before clap parses, so
+/// `env = "PORT"` automatically picks up values from .lenv/.env files.
 #[derive(Parser, Debug)]
 #[command(name = "my-server")]
 #[command(about = "A web server with unified configuration")]
 #[command(version)]
 struct Args {
     /// Server port
-    #[arg(short, long, default_value_t = getenv_int("PORT", 3000) as u16)]
+    #[arg(short, long, env = "PORT", default_value = "3000")]
     port: u16,
 
     /// API key for authentication
-    #[arg(short = 'k', long, default_value = getenv("API_KEY", ""))]
-    api_key: String,
+    #[arg(short = 'k', long, env = "API_KEY")]
+    api_key: Option<String>,
 
     /// Enable verbose logging
-    #[arg(short, long, default_value_t = getenv_bool("VERBOSE", false))]
+    #[arg(short, long, env = "VERBOSE")]
     verbose: bool,
 
     /// Configuration file path (.lenv format)
@@ -33,15 +41,12 @@ struct Args {
 }
 
 fn main() {
-    // Load .lenv file first (like dotenvy loads .env, but for .lenv format)
-    load_lenv_file(".lenv").ok();
+    // lino_parse() loads .lenv + .env, then delegates to clap's parse()
+    let args = Args::lino_parse();
 
-    // Parse CLI arguments — clap's derive macro works through lino-arguments
-    let args = Args::parse();
-
-    // Load additional config file if specified via --configuration
+    // If --configuration was provided, load that .lenv file too
     if let Some(ref config_path) = args.configuration {
-        if let Err(e) = load_lenv_file(config_path) {
+        if let Err(e) = lino_arguments::load_lenv_file(config_path) {
             eprintln!("Warning: Failed to load config '{}': {}", config_path, e);
         }
     }
@@ -50,10 +55,10 @@ fn main() {
     println!("  Port: {}", args.port);
     println!(
         "  API Key: {}",
-        if args.api_key.is_empty() {
-            "(not set)"
+        if let Some(ref key) = args.api_key {
+            key.as_str()
         } else {
-            &args.api_key
+            "(not set)"
         }
     );
     println!("  Verbose: {}", args.verbose);

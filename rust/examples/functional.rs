@@ -15,6 +15,7 @@ fn main() {
             .about("A web server with unified configuration")
             .version("1.0.0")
             .lenv(".lenv")
+            .env(".env")
             .option_short("port", 'p', "Server port", "3000")
             .option_short("api-key", 'k', "API key for authentication", "")
             .flag_short("verbose", 'v', "Enable verbose logging")

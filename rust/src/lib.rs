@@ -10,33 +10,37 @@
 //! Priority (highest to lowest):
 //! 1. CLI arguments (manually entered options)
 //! 2. Environment variables (from process.env)
-//! 3. Configuration file (lenv file specified via CLI)
-//! 4. Default values
+//! 3. Configuration file (.lenv file specified via `--configuration` or `.lenv()`)
+//! 4. `.lenv` file (local environment overrides)
+//! 5. `.env` file (standard dotenv, for compatibility)
+//! 6. Default values
 //!
-//! # Struct-Based Usage (like clap)
+//! # Drop-in Replacement for clap
+//!
+//! The `LinoParser` trait extends clap's `Parser` so that `#[arg(env = "PORT")]`
+//! automatically reads from `.lenv` files, `.env` files, and real environment
+//! variables — with no extra boilerplate:
 //!
 //! ```rust,ignore
-//! use lino_arguments::{Parser, getenv, getenv_int, getenv_bool, load_lenv_file};
-//!
-//! // Load .lenv file first (like dotenvy, but for .lenv format)
-//! load_lenv_file(".lenv").ok();
+//! use lino_arguments::{LinoParser, Parser};
 //!
 //! #[derive(Parser, Debug)]
 //! #[command(name = "my-app")]
 //! struct Args {
-//!     #[arg(short, long, default_value_t = getenv_int("PORT", 3000) as u16)]
+//!     #[arg(long, env = "PORT", default_value = "3000")]
 //!     port: u16,
 //!
-//!     #[arg(short = 'k', long, default_value = getenv("API_KEY", ""))]
-//!     api_key: String,
+//!     #[arg(long, env = "API_KEY")]
+//!     api_key: Option<String>,
 //!
-//!     #[arg(short, long, default_value_t = getenv_bool("VERBOSE", false))]
+//!     #[arg(long, env = "VERBOSE")]
 //!     verbose: bool,
 //! }
 //!
 //! fn main() {
-//!     let args = Args::parse();
-//!     println!("Server starting on port {}", args.port);
+//!     // Loads .lenv, .env into process env, then parses CLI args via clap
+//!     let args = Args::lino_parse();
+//!     println!("port = {}", args.port);
 //! }
 //! ```
 //!
@@ -103,6 +107,102 @@ pub enum ConfigError {
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 }
+
+// ============================================================================
+// LinoParser Trait — drop-in replacement for clap::Parser
+// ============================================================================
+
+/// Extension trait for clap's `Parser` that automatically loads `.lenv` and
+/// `.env` files into the process environment before parsing CLI arguments.
+///
+/// This enables `#[arg(long, env = "PORT", default_value = "3000")]` to
+/// automatically resolve values from `.lenv` files, `.env` files, real
+/// environment variables, and defaults — with no extra boilerplate.
+///
+/// # Priority (highest to lowest)
+///
+/// 1. CLI arguments (`--port 8080`)
+/// 2. Environment variables already set in the process
+/// 3. Values from `.lenv` file (loaded into env, won't overwrite existing)
+/// 4. Values from `.env` file (loaded into env, won't overwrite existing)
+/// 5. `default_value` from the `#[arg(...)]` attribute
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use lino_arguments::{LinoParser, Parser};
+///
+/// #[derive(Parser, Debug)]
+/// struct Args {
+///     #[arg(long, env = "PORT", default_value = "3000")]
+///     port: u16,
+/// }
+///
+/// let args = Args::lino_parse();
+/// ```
+pub trait LinoParser: Parser {
+    /// Parse CLI arguments after loading `.lenv` and `.env` files.
+    ///
+    /// Equivalent to calling:
+    /// ```rust,ignore
+    /// load_lenv_file(".lenv").ok();
+    /// load_env_file(".env").ok();
+    /// Args::parse()
+    /// ```
+    fn lino_parse() -> Self {
+        load_lenv_file(".lenv").ok();
+        load_env_file(".env").ok();
+        Self::parse()
+    }
+
+    /// Parse CLI arguments after loading specified `.lenv` and `.env` files.
+    ///
+    /// # Arguments
+    ///
+    /// * `lenv_path` - Path to the `.lenv` file (or `None` to skip)
+    /// * `env_path` - Path to the `.env` file (or `None` to skip)
+    fn lino_parse_with(lenv_path: Option<&str>, env_path: Option<&str>) -> Self {
+        if let Some(path) = lenv_path {
+            load_lenv_file(path).ok();
+        }
+        if let Some(path) = env_path {
+            load_env_file(path).ok();
+        }
+        Self::parse()
+    }
+
+    /// Parse from custom arguments after loading `.lenv` and `.env` files.
+    /// Useful for testing.
+    fn lino_parse_from<I, T>(args: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<std::ffi::OsString> + Clone,
+    {
+        load_lenv_file(".lenv").ok();
+        load_env_file(".env").ok();
+        Self::parse_from(args)
+    }
+
+    /// Parse from custom arguments after loading specified config files.
+    /// Useful for testing.
+    fn lino_parse_from_with<I, T>(args: I, lenv_path: Option<&str>, env_path: Option<&str>) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<std::ffi::OsString> + Clone,
+    {
+        if let Some(path) = lenv_path {
+            load_lenv_file(path).ok();
+        }
+        if let Some(path) = env_path {
+            load_env_file(path).ok();
+        }
+        Self::parse_from(args)
+    }
+}
+
+/// Blanket implementation: any type that implements clap's `Parser`
+/// automatically gets `LinoParser` methods.
+impl<T: Parser> LinoParser for T {}
 
 // ============================================================================
 // .lenv File Loading
@@ -175,6 +275,81 @@ pub fn load_lenv_file_override(file_path: &str) -> Result<usize, ConfigError> {
         if let Some(value) = lenv.get(&key) {
             env::set_var(&key, &value);
             loaded_count += 1;
+        }
+    }
+
+    Ok(loaded_count)
+}
+
+// ============================================================================
+// .env File Loading (standard dotenv format, for compatibility)
+// ============================================================================
+
+/// Load environment variables from a `.env` file (standard `KEY=VALUE` format).
+///
+/// Uses the [dotenvy](https://docs.rs/dotenvy) crate under the hood.
+/// Existing environment variables are NOT overwritten.
+///
+/// # Arguments
+///
+/// * `file_path` - Path to the `.env` file
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// use lino_arguments::load_env_file;
+///
+/// // Load from default .env file
+/// load_env_file(".env").ok();
+/// ```
+pub fn load_env_file(file_path: &str) -> Result<usize, ConfigError> {
+    let path = std::path::Path::new(file_path);
+    if !path.exists() {
+        return Ok(0);
+    }
+
+    let iter = dotenvy::from_path_iter(path)
+        .map_err(|e| ConfigError::FileError(format!("Failed to read {}: {}", file_path, e)))?;
+
+    let mut loaded_count = 0;
+    for item in iter {
+        match item {
+            Ok((key, value)) => {
+                // Only set if not already present in environment
+                if env::var(&key).is_err() {
+                    env::set_var(&key, &value);
+                    loaded_count += 1;
+                }
+            }
+            Err(_) => continue,
+        }
+    }
+
+    Ok(loaded_count)
+}
+
+/// Load environment variables from a `.env` file, overwriting existing values.
+///
+/// # Arguments
+///
+/// * `file_path` - Path to the `.env` file
+pub fn load_env_file_override(file_path: &str) -> Result<usize, ConfigError> {
+    let path = std::path::Path::new(file_path);
+    if !path.exists() {
+        return Ok(0);
+    }
+
+    let iter = dotenvy::from_path_iter(path)
+        .map_err(|e| ConfigError::FileError(format!("Failed to read {}: {}", file_path, e)))?;
+
+    let mut loaded_count = 0;
+    for item in iter {
+        match item {
+            Ok((key, value)) => {
+                env::set_var(&key, &value);
+                loaded_count += 1;
+            }
+            Err(_) => continue,
         }
     }
 
@@ -525,6 +700,8 @@ pub struct ConfigBuilder {
     options: Vec<OptionDef>,
     lenv_path: Option<String>,
     lenv_override: bool,
+    env_path: Option<String>,
+    env_override: bool,
     app_name: Option<String>,
     app_about: Option<String>,
     app_version: Option<String>,
@@ -536,6 +713,8 @@ impl ConfigBuilder {
             options: Vec::new(),
             lenv_path: None,
             lenv_override: false,
+            env_path: None,
+            env_override: false,
             app_name: None,
             app_about: None,
             app_version: None,
@@ -571,6 +750,20 @@ impl ConfigBuilder {
     pub fn lenv_override(&mut self, path: &str) -> &mut Self {
         self.lenv_path = Some(path.to_string());
         self.lenv_override = true;
+        self
+    }
+
+    /// Load a .env configuration file (without overriding existing env vars).
+    pub fn env(&mut self, path: &str) -> &mut Self {
+        self.env_path = Some(path.to_string());
+        self.env_override = false;
+        self
+    }
+
+    /// Load a .env configuration file, overriding existing env vars.
+    pub fn env_override(&mut self, path: &str) -> &mut Self {
+        self.env_path = Some(path.to_string());
+        self.env_override = true;
         self
     }
 
@@ -634,14 +827,15 @@ impl ConfigBuilder {
     /// 1. CLI arguments (highest priority)
     /// 2. Environment variables
     /// 3. .lenv file
-    /// 4. Default values (lowest priority)
+    /// 4. .env file
+    /// 5. Default values (lowest priority)
     fn build(&self) -> Config {
         self.build_from(env::args_os().collect())
     }
 
     /// Build the configuration from custom arguments (for testing).
     fn build_from(&self, args: Vec<std::ffi::OsString>) -> Config {
-        // Step 1: Load .lenv file if configured
+        // Step 1: Load .lenv file if configured (higher priority than .env)
         if let Some(ref path) = self.lenv_path {
             if self.lenv_override {
                 let _ = load_lenv_file_override(path);
@@ -650,7 +844,16 @@ impl ConfigBuilder {
             }
         }
 
-        // Step 2: Build clap command dynamically
+        // Step 2: Load .env file if configured (lower priority than .lenv)
+        if let Some(ref path) = self.env_path {
+            if self.env_override {
+                let _ = load_env_file_override(path);
+            } else {
+                let _ = load_env_file(path);
+            }
+        }
+
+        // Step 3: Build clap command dynamically
         let mut cmd =
             clap::Command::new(self.app_name.clone().unwrap_or_else(|| "app".to_string()));
 
@@ -674,6 +877,7 @@ impl ConfigBuilder {
         // Add user-defined options
         for opt in &self.options {
             let kebab_name = to_kebab_case(&opt.name);
+            let env_name = to_upper_case(&opt.name);
 
             let mut arg = clap::Arg::new(kebab_name.clone()).long(kebab_name.clone());
 
@@ -687,23 +891,26 @@ impl ConfigBuilder {
             if opt.is_flag {
                 arg = arg.action(clap::ArgAction::SetTrue);
             } else {
-                // Resolve default: env var (with case-insensitive lookup) > .lenv > default
-                let env_default = getenv(&opt.name, &opt.default);
-                arg = arg.default_value(env_default);
+                // Use clap's env feature so it picks up values from env vars
+                // (which now include .lenv and .env values we loaded above)
+                arg = arg.env(env_name);
+                if !opt.default.is_empty() {
+                    arg = arg.default_value(opt.default.clone());
+                }
             }
 
             cmd = cmd.arg(arg);
         }
 
-        // Step 3: Parse arguments
+        // Step 4: Parse arguments
         let matches = cmd.get_matches_from(args);
 
-        // Step 4: Load --configuration file if provided
+        // Step 5: Load --configuration file if provided
         if let Some(config_path) = matches.get_one::<String>("configuration") {
             let _ = load_lenv_file_override(config_path);
         }
 
-        // Step 5: Collect values into Config
+        // Step 6: Collect values into Config
         let mut values = HashMap::new();
 
         for opt in &self.options {
@@ -725,14 +932,15 @@ impl ConfigBuilder {
 /// Create a unified configuration using a functional builder API.
 ///
 /// This is the Rust equivalent of the JavaScript `makeConfig` function.
-/// It combines .lenv file loading, environment variables, and CLI argument
-/// parsing into a single configuration step.
+/// It combines .lenv file loading, .env file loading, environment variables,
+/// and CLI argument parsing into a single configuration step.
 ///
 /// Priority (highest to lowest):
 /// 1. CLI arguments
 /// 2. Environment variables
 /// 3. .lenv file (via `--configuration` flag or builder `.lenv()`)
-/// 4. Default values
+/// 4. .env file (via builder `.env()`)
+/// 5. Default values
 ///
 /// # Example
 ///
@@ -741,6 +949,7 @@ impl ConfigBuilder {
 ///
 /// let config = make_config(|c| {
 ///     c.lenv(".lenv")
+///      .env(".env")
 ///      .option("port", "Server port", "3000")
 ///      .option_short("api-key", 'k', "API key", "")
 ///      .flag("verbose", "Enable verbose logging")
@@ -842,7 +1051,6 @@ mod tests {
 
         #[test]
         fn test_getenv_with_default() {
-            // Test that default is returned for non-existent var
             let result = getenv("NON_EXISTENT_VAR_12345", "default");
             assert_eq!(result, "default");
         }

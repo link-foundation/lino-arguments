@@ -1,7 +1,12 @@
 ### Added
+- `LinoParser` trait extending clap's `Parser` — `lino_parse()` automatically loads `.lenv` and `.env` files before CLI parsing
+- Full support for `#[arg(long, env = "PORT", default_value = "3000")]` with automatic `.lenv`/`.env` resolution
+- `lino_parse_with()`, `lino_parse_from()`, `lino_parse_from_with()` methods for custom file paths and testing
+- `load_env_file()` and `load_env_file_override()` for standard `.env` file support via dotenvy
+- `.env()` and `.env_override()` methods on `ConfigBuilder` for functional API
 - Re-exported clap derive macros (`Parser`, `Args`, `Subcommand`, `ValueEnum`) for struct-based CLI parsing without a separate clap dependency
-- New `make_config()` functional builder API inspired by the JavaScript `makeConfig` function
-- New `make_config_from()` for testing with custom arguments
+- `make_config()` functional builder API inspired by the JavaScript `makeConfig` function
+- `make_config_from()` for testing with custom arguments
 - `Config` type with `.get()`, `.get_int()`, `.get_bool()`, and `.has()` accessors
-- `ConfigBuilder` with chainable `.option()`, `.flag()`, `.lenv()`, `.name()`, `.about()`, `.version()` methods
+- `ConfigBuilder` with chainable `.option()`, `.flag()`, `.lenv()`, `.env()`, `.name()`, `.about()`, `.version()` methods
 - Examples for both struct-based and functional usage patterns

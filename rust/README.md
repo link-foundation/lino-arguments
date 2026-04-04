@@ -9,9 +9,10 @@ A unified configuration library combining environment variables and CLI argument
 `lino-arguments` provides a unified configuration system that automatically loads configuration from multiple sources with a clear priority chain:
 
 1. **CLI arguments** - Highest priority (manually entered options)
-2. **Environment variables** - With case-insensitive lookup
-3. **Configuration file** - Dynamic config file path via CLI
-4. **Default values** - Fallback values
+2. **Environment variables** - Already set in the process
+3. **`.lenv` file** - Links Notation environment file
+4. **`.env` file** - Standard dotenv file (for compatibility)
+5. **Default values** - Fallback values
 
 ## Installation
 
@@ -22,32 +23,87 @@ Add to your `Cargo.toml`:
 lino-arguments = "0.2"
 ```
 
-## Struct-Based Usage (like clap)
+## Struct-Based Usage (drop-in clap replacement)
 
-The `Parser` derive macro is re-exported from clap, so you can use `lino-arguments` as a drop-in replacement without depending on clap directly:
+Use `LinoParser` trait with standard clap `#[arg(env = "...")]` attributes. The `.lenv` and `.env` files are loaded automatically before parsing:
 
 ```rust
-use lino_arguments::{Parser, getenv, getenv_int, getenv_bool, load_lenv_file};
-
-// Load .lenv file (like dotenvy loads .env, but for .lenv format)
-load_lenv_file(".lenv").ok();
+use lino_arguments::{LinoParser, Parser};
 
 #[derive(Parser, Debug)]
 #[command(name = "my-app")]
 struct Args {
-    #[arg(short, long, default_value_t = getenv_int("PORT", 3000) as u16)]
+    #[arg(long, env = "PORT", default_value = "3000")]
     port: u16,
 
-    #[arg(short = 'k', long, default_value = getenv("API_KEY", ""))]
-    api_key: String,
+    #[arg(long, env = "API_KEY")]
+    api_key: Option<String>,
 
-    #[arg(short, long, default_value_t = getenv_bool("VERBOSE", false))]
+    #[arg(long, env = "VERBOSE")]
     verbose: bool,
 }
 
 fn main() {
-    let args = Args::parse();
+    // Loads .lenv + .env into process env, then parses CLI args via clap
+    let args = Args::lino_parse();
     println!("Server starting on port {}", args.port);
+}
+```
+
+With a `.lenv` file:
+```
+PORT: 8080
+API_KEY: my-secret-key
+```
+
+Or a `.env` file:
+```
+PORT=8080
+API_KEY=my-secret-key
+```
+
+The priority chain ensures CLI arguments always win:
+```bash
+# Uses default (3000)
+cargo run
+
+# Uses .lenv value (8080)
+# (if PORT: 8080 is in .lenv)
+cargo run
+
+# Uses env var (9090)
+PORT=9090 cargo run
+
+# Uses CLI argument (7070)
+cargo run -- --port 7070
+```
+
+### LinoParser Methods
+
+| Method | Description |
+|--------|-------------|
+| `lino_parse()` | Load `.lenv` + `.env`, then parse CLI args |
+| `lino_parse_with(lenv, env)` | Load specified files, then parse |
+| `lino_parse_from(args)` | Load `.lenv` + `.env`, parse custom args (for testing) |
+| `lino_parse_from_with(args, lenv, env)` | Load specified files, parse custom args |
+
+### Legacy Struct-Based Usage
+
+You can also use `getenv` helpers in `default_value` expressions with `Parser::parse()`:
+
+```rust
+use lino_arguments::{Parser, getenv, getenv_int, getenv_bool, load_lenv_file};
+
+load_lenv_file(".lenv").ok();
+
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(short, long, default_value_t = getenv_int("PORT", 3000) as u16)]
+    port: u16,
+}
+
+fn main() {
+    let args = Args::parse();
 }
 ```
 
@@ -62,6 +118,7 @@ fn main() {
     let config = make_config_from(std::env::args_os(), |c| {
         c.name("my-server")
          .lenv(".lenv")
+         .env(".env")
          .option_short("port", 'p', "Server port", "3000")
          .option_short("api-key", 'k', "API key", "")
          .flag_short("verbose", 'v', "Enable verbose logging")
@@ -86,6 +143,15 @@ fn main() {
 - `arg!` - Macro for inline argument definitions
 - `command!` - Macro for command metadata
 
+### File Loading Functions
+
+| Function | Description |
+|----------|-------------|
+| `load_lenv_file(path)` | Load `.lenv` file (won't overwrite existing env vars) |
+| `load_lenv_file_override(path)` | Load `.lenv` file (overwrites existing env vars) |
+| `load_env_file(path)` | Load `.env` file (won't overwrite existing env vars) |
+| `load_env_file_override(path)` | Load `.env` file (overwrites existing env vars) |
+
 ### Functional Configuration
 
 #### `make_config(configure)`
@@ -97,6 +163,7 @@ use lino_arguments::make_config;
 
 let config = make_config(|c| {
     c.lenv(".lenv")
+     .env(".env")
      .option("port", "Server port", "3000")
      .flag("verbose", "Enable verbose logging")
 });
@@ -124,6 +191,8 @@ assert_eq!(config.get("port"), "9090");
 | `.version(version)` | Set application version |
 | `.lenv(path)` | Load .lenv file (without overriding existing env vars) |
 | `.lenv_override(path)` | Load .lenv file (overriding existing env vars) |
+| `.env(path)` | Load .env file (without overriding existing env vars) |
+| `.env_override(path)` | Load .env file (overriding existing env vars) |
 | `.option(name, desc, default)` | Define a string option |
 | `.option_short(name, short, desc, default)` | Define a string option with short flag |
 | `.flag(name, desc)` | Define a boolean flag |
