@@ -651,9 +651,8 @@ impl ConfigBuilder {
         }
 
         // Step 2: Build clap command dynamically
-        let mut cmd = clap::Command::new(
-            self.app_name.clone().unwrap_or_else(|| "app".to_string()),
-        );
+        let mut cmd =
+            clap::Command::new(self.app_name.clone().unwrap_or_else(|| "app".to_string()));
 
         if let Some(ref about) = self.app_about {
             cmd = cmd.about(about.clone());

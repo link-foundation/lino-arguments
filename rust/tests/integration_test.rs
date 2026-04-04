@@ -384,9 +384,7 @@ mod make_config_tests {
 
     #[test]
     fn test_make_config_flag_default_false() {
-        let config = make_config_from(["app"], |c| {
-            c.flag("verbose", "Enable verbose logging")
-        });
+        let config = make_config_from(["app"], |c| c.flag("verbose", "Enable verbose logging"));
 
         assert!(!config.get_bool("verbose"));
     }
@@ -420,9 +418,7 @@ mod make_config_tests {
 
     #[test]
     fn test_make_config_get_int_default() {
-        let config = make_config_from(["app"], |c| {
-            c.option("retries", "Retry count", "")
-        });
+        let config = make_config_from(["app"], |c| c.option("retries", "Retry count", ""));
 
         assert_eq!(config.get_int("retries", 5), 5);
     }
@@ -460,8 +456,7 @@ mod make_config_tests {
         env::remove_var("PORT");
 
         let config = make_config_from(["app"], |c| {
-            c.lenv(file_path_str)
-                .option("port", "Server port", "3000")
+            c.lenv(file_path_str).option("port", "Server port", "3000")
         });
 
         assert_eq!(config.get("port"), "7070");
@@ -481,8 +476,7 @@ mod make_config_tests {
         env::remove_var("PORT");
 
         let config = make_config_from(["app", "--port", "9999"], |c| {
-            c.lenv(file_path_str)
-                .option("port", "Server port", "3000")
+            c.lenv(file_path_str).option("port", "Server port", "3000")
         });
 
         // CLI should override .lenv value
