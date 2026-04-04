@@ -1,19 +1,24 @@
 //! lino-arguments CLI binary
 //!
-//! This is a simple CLI example showing how to use lino-arguments.
+//! This is a simple CLI example showing how to use lino-arguments
+//! as a true drop-in replacement for clap with .lenv/.env file support.
+//! Just change the import — everything else is identical to clap.
 
-use clap::Parser;
-use lino_arguments::{getenv, getenv_bool, getenv_int, load_lenv_file};
+use lino_arguments::{load_lenv_file, Parser};
 
-/// A unified configuration example
+/// A unified configuration example.
+///
+/// Uses standard clap `#[arg(env = "...")]` attributes.
+/// lino-arguments automatically loads .lenv and .env files into the process
+/// environment at startup, so `env` attributes pick up values from these files.
 #[derive(Parser, Debug)]
 #[command(name = "lino-arguments")]
 #[command(about = "A unified configuration library example")]
 #[command(version)]
 struct Args {
     /// Server port
-    #[arg(short, long, env = "PORT")]
-    port: Option<u16>,
+    #[arg(short, long, env = "PORT", default_value = "3000")]
+    port: u16,
 
     /// API key
     #[arg(short = 'k', long, env = "API_KEY")]
@@ -28,57 +33,36 @@ struct Args {
     configuration: Option<String>,
 }
 
-/// Resolved configuration with defaults applied
-struct Config {
-    port: u16,
-    api_key: String,
-    verbose: bool,
-    configuration: Option<String>,
-}
+fn main() {
+    // No init() needed — .lenv and .env are loaded automatically at startup
+    let args = Args::parse();
 
-impl Config {
-    fn from_args(args: Args) -> Self {
-        // Load configuration file if specified
-        // This sets environment variables from the .lenv file
-        // (only for values not already set in the environment)
-        if let Some(ref config_path) = args.configuration {
-            if let Err(e) = load_lenv_file(config_path) {
-                eprintln!(
-                    "Warning: Failed to load config file '{}': {}",
-                    config_path, e
-                );
-            }
-        }
-
-        Config {
-            port: args.port.unwrap_or_else(|| getenv_int("PORT", 3000) as u16),
-            api_key: args.api_key.unwrap_or_else(|| getenv("API_KEY", "")),
-            verbose: args.verbose || getenv_bool("VERBOSE", false),
-            configuration: args.configuration,
+    // Load additional config file if specified via --configuration
+    if let Some(ref config_path) = args.configuration {
+        if let Err(e) = load_lenv_file(config_path) {
+            eprintln!(
+                "Warning: Failed to load config file '{}': {}",
+                config_path, e
+            );
         }
     }
-}
 
-fn main() {
-    let args = Args::parse();
-    let config = Config::from_args(args);
-
-    if config.verbose {
+    if args.verbose {
         println!("Configuration loaded:");
-        println!("  Port: {}", config.port);
+        println!("  Port: {}", args.port);
         println!(
             "  API Key: {}",
-            if config.api_key.is_empty() {
-                "(not set)"
+            if let Some(ref key) = args.api_key {
+                key.as_str()
             } else {
-                &config.api_key
+                "(not set)"
             }
         );
-        println!("  Verbose: {}", config.verbose);
-        if let Some(cfg) = &config.configuration {
+        println!("  Verbose: {}", args.verbose);
+        if let Some(ref cfg) = args.configuration {
             println!("  Config file: {}", cfg);
         }
     }
 
-    println!("Server would start on port {}", config.port);
+    println!("Server would start on port {}", args.port);
 }

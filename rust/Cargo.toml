@@ -18,7 +18,9 @@ name = "lino-arguments"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4.4", features = ["derive", "env"] }
+clap = { version = "4.4", features = ["derive", "env", "string"] }
+ctor = "0.4.3"
+dotenvy = "0.15"
 lino-env = "0.1.0"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
