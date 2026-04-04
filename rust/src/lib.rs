@@ -4,25 +4,24 @@
 //! easy-to-use configuration system with clear priority ordering.
 //!
 //! Works like a combination of [clap](https://docs.rs/clap) and
-//! [dotenvy](https://docs.rs/dotenvy), but uses `.lenv` files via
-//! [lino-env](https://docs.rs/lino-env) instead of `.env` files.
+//! [dotenvy](https://docs.rs/dotenvy), but also with support for `.lenv` files
+//! via [lino-env](https://docs.rs/lino-env).
 //!
 //! Priority (highest to lowest):
 //! 1. CLI arguments (manually entered options)
-//! 2. Environment variables (from process.env)
-//! 3. Configuration file (.lenv file specified via `--configuration` or `.lenv()`)
-//! 4. `.lenv` file (local environment overrides)
-//! 5. `.env` file (standard dotenv, for compatibility)
-//! 6. Default values
+//! 2. Environment variables (from process env)
+//! 3. `.lenv` file (local environment overrides)
+//! 4. `.env` file (standard dotenv, for compatibility)
+//! 5. Default values
 //!
 //! # Drop-in Replacement for clap
 //!
-//! The `LinoParser` trait extends clap's `Parser` so that `#[arg(env = "PORT")]`
-//! automatically reads from `.lenv` files, `.env` files, and real environment
-//! variables — with no extra boilerplate:
+//! Use `lino_arguments::Parser` instead of `clap::Parser` — everything else
+//! stays the same. Call `Args::parse()` and `.lenv`/`.env` files are loaded
+//! automatically:
 //!
 //! ```rust,ignore
-//! use lino_arguments::{LinoParser, Parser};
+//! use lino_arguments::Parser;
 //!
 //! #[derive(Parser, Debug)]
 //! #[command(name = "my-app")]
@@ -38,8 +37,7 @@
 //! }
 //!
 //! fn main() {
-//!     // Loads .lenv, .env into process env, then parses CLI args via clap
-//!     let args = Args::lino_parse();
+//!     let args = Args::parse();
 //!     println!("port = {}", args.port);
 //! }
 //! ```
@@ -51,6 +49,7 @@
 //!
 //! let config = make_config(|c| {
 //!     c.lenv(".lenv")
+//!      .env(".env")
 //!      .option("port", "Server port", "3000")
 //!      .option("api-key", "API key", "")
 //!      .flag("verbose", "Enable verbose logging")
@@ -74,10 +73,11 @@ use std::collections::HashMap;
 use std::env;
 use thiserror::Error;
 
-// Re-export clap derive macros and traits for struct-based usage.
-// This allows users to use `lino_arguments::Parser` directly without
-// depending on clap as a separate dependency.
-pub use clap::{Args, Parser, Subcommand, ValueEnum};
+// Re-export clap's Parser (derive macro + trait) so that `#[derive(Parser)]`
+// and `Args::parse()` work out of the box. Users import `lino_arguments::Parser`
+// as a drop-in replacement for `clap::Parser`.
+pub use clap::Parser;
+pub use clap::{Args, Subcommand, ValueEnum};
 
 // Re-export the arg attribute macro
 pub use clap::arg;
@@ -112,12 +112,61 @@ pub enum ConfigError {
 // LinoParser Trait — drop-in replacement for clap::Parser
 // ============================================================================
 
-/// Extension trait for clap's `Parser` that automatically loads `.lenv` and
-/// `.env` files into the process environment before parsing CLI arguments.
+// ============================================================================
+// init() — Load .lenv and .env files into the process environment
+// ============================================================================
+
+/// Load `.lenv` and `.env` files into the process environment.
 ///
-/// This enables `#[arg(long, env = "PORT", default_value = "3000")]` to
-/// automatically resolve values from `.lenv` files, `.env` files, real
-/// environment variables, and defaults — with no extra boilerplate.
+/// Call this before `Args::parse()` to get the full priority chain:
+/// CLI args > env vars > `.lenv` > `.env` > `default_value`.
+///
+/// This is the recommended approach for a true drop-in clap replacement:
+///
+/// ```rust,ignore
+/// use lino_arguments::Parser;
+///
+/// #[derive(Parser, Debug)]
+/// struct Args {
+///     #[arg(long, env = "PORT", default_value = "3000")]
+///     port: u16,
+/// }
+///
+/// fn main() {
+///     lino_arguments::init();   // loads .lenv + .env into process env
+///     let args = Args::parse(); // standard clap API — no changes needed
+/// }
+/// ```
+pub fn init() {
+    load_lenv_file(".lenv").ok();
+    load_env_file(".env").ok();
+}
+
+/// Load specified `.lenv` and `.env` files into the process environment.
+///
+/// Like [`init()`], but with custom file paths.
+///
+/// ```rust,ignore
+/// lino_arguments::init_with(Some(".lenv"), Some(".env.local"));
+/// let args = Args::parse();
+/// ```
+pub fn init_with(lenv_path: Option<&str>, env_path: Option<&str>) {
+    if let Some(path) = lenv_path {
+        load_lenv_file(path).ok();
+    }
+    if let Some(path) = env_path {
+        load_env_file(path).ok();
+    }
+}
+
+// ============================================================================
+// LinoParser Trait — convenience extension for clap::Parser
+// ============================================================================
+
+/// Extension trait for clap's `Parser` that combines `.lenv`/`.env` loading
+/// with CLI argument parsing in a single call.
+///
+/// Automatically implemented for any type that derives `clap::Parser`.
 ///
 /// # Priority (highest to lowest)
 ///
@@ -130,7 +179,7 @@ pub enum ConfigError {
 /// # Example
 ///
 /// ```rust,ignore
-/// use lino_arguments::{LinoParser, Parser};
+/// use lino_arguments::{Parser, LinoParser};
 ///
 /// #[derive(Parser, Debug)]
 /// struct Args {
@@ -138,37 +187,24 @@ pub enum ConfigError {
 ///     port: u16,
 /// }
 ///
+/// // Option 1: init() + standard parse() (recommended drop-in)
+/// lino_arguments::init();
+/// let args = Args::parse();
+///
+/// // Option 2: lino_parse() one-liner
 /// let args = Args::lino_parse();
 /// ```
 pub trait LinoParser: Parser {
     /// Parse CLI arguments after loading `.lenv` and `.env` files.
-    ///
-    /// Equivalent to calling:
-    /// ```rust,ignore
-    /// load_lenv_file(".lenv").ok();
-    /// load_env_file(".env").ok();
-    /// Args::parse()
-    /// ```
     fn lino_parse() -> Self {
-        load_lenv_file(".lenv").ok();
-        load_env_file(".env").ok();
-        Self::parse()
+        init();
+        <Self as Parser>::parse()
     }
 
     /// Parse CLI arguments after loading specified `.lenv` and `.env` files.
-    ///
-    /// # Arguments
-    ///
-    /// * `lenv_path` - Path to the `.lenv` file (or `None` to skip)
-    /// * `env_path` - Path to the `.env` file (or `None` to skip)
     fn lino_parse_with(lenv_path: Option<&str>, env_path: Option<&str>) -> Self {
-        if let Some(path) = lenv_path {
-            load_lenv_file(path).ok();
-        }
-        if let Some(path) = env_path {
-            load_env_file(path).ok();
-        }
-        Self::parse()
+        init_with(lenv_path, env_path);
+        <Self as Parser>::parse()
     }
 
     /// Parse from custom arguments after loading `.lenv` and `.env` files.
@@ -178,9 +214,8 @@ pub trait LinoParser: Parser {
         I: IntoIterator<Item = T>,
         T: Into<std::ffi::OsString> + Clone,
     {
-        load_lenv_file(".lenv").ok();
-        load_env_file(".env").ok();
-        Self::parse_from(args)
+        init();
+        <Self as Parser>::parse_from(args)
     }
 
     /// Parse from custom arguments after loading specified config files.
@@ -190,17 +225,12 @@ pub trait LinoParser: Parser {
         I: IntoIterator<Item = T>,
         T: Into<std::ffi::OsString> + Clone,
     {
-        if let Some(path) = lenv_path {
-            load_lenv_file(path).ok();
-        }
-        if let Some(path) = env_path {
-            load_env_file(path).ok();
-        }
-        Self::parse_from(args)
+        init_with(lenv_path, env_path);
+        <Self as Parser>::parse_from(args)
     }
 }
 
-/// Blanket implementation: any type that implements clap's `Parser`
+/// Blanket implementation: any type that derives `clap::Parser`
 /// automatically gets `LinoParser` methods.
 impl<T: Parser> LinoParser for T {}
 

@@ -3,12 +3,12 @@
 //! This is a simple CLI example showing how to use lino-arguments
 //! as a drop-in replacement for clap with .lenv/.env file support.
 
-use lino_arguments::{load_lenv_file, LinoParser, Parser};
+use lino_arguments::{load_lenv_file, Parser};
 
 /// A unified configuration example.
 ///
 /// Uses standard clap `#[arg(env = "...")]` attributes.
-/// `LinoParser::lino_parse()` loads .lenv and .env files into the process
+/// `lino_arguments::init()` loads .lenv and .env files into the process
 /// environment before clap parses, so `env` attributes automatically pick
 /// up values from .lenv/.env files.
 #[derive(Parser, Debug)]
@@ -34,8 +34,9 @@ struct Args {
 }
 
 fn main() {
-    // lino_parse() = load .lenv + .env, then parse CLI args
-    let args = Args::lino_parse();
+    // init() loads .lenv + .env into process env, then parse() works as usual
+    lino_arguments::init();
+    let args = Args::parse();
 
     // Load additional config file if specified via --configuration
     if let Some(ref config_path) = args.configuration {

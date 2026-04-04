@@ -25,10 +25,10 @@ lino-arguments = "0.2"
 
 ## Struct-Based Usage (drop-in clap replacement)
 
-Use `LinoParser` trait with standard clap `#[arg(env = "...")]` attributes. The `.lenv` and `.env` files are loaded automatically before parsing:
+Replace `use clap::Parser` with `use lino_arguments::Parser`, add `lino_arguments::init()` before `Args::parse()` — everything else stays the same:
 
 ```rust
-use lino_arguments::{LinoParser, Parser};
+use lino_arguments::Parser;
 
 #[derive(Parser, Debug)]
 #[command(name = "my-app")]
@@ -44,8 +44,8 @@ struct Args {
 }
 
 fn main() {
-    // Loads .lenv + .env into process env, then parses CLI args via clap
-    let args = Args::lino_parse();
+    lino_arguments::init();   // loads .lenv + .env into process env
+    let args = Args::parse(); // standard clap API — no changes needed
     println!("Server starting on port {}", args.port);
 }
 ```
@@ -78,7 +78,30 @@ PORT=9090 cargo run
 cargo run -- --port 7070
 ```
 
-### LinoParser Methods
+### init() Functions
+
+| Function | Description |
+|----------|-------------|
+| `init()` | Load `.lenv` + `.env` files into process env |
+| `init_with(lenv, env)` | Load specified files into process env |
+
+### LinoParser Trait (alternative one-liner API)
+
+For a single-call approach, use the `LinoParser` trait:
+
+```rust
+use lino_arguments::{Parser, LinoParser};
+
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(long, env = "PORT", default_value = "3000")]
+    port: u16,
+}
+
+fn main() {
+    let args = Args::lino_parse(); // loads .lenv + .env + parse in one call
+}
+```
 
 | Method | Description |
 |--------|-------------|
@@ -86,26 +109,6 @@ cargo run -- --port 7070
 | `lino_parse_with(lenv, env)` | Load specified files, then parse |
 | `lino_parse_from(args)` | Load `.lenv` + `.env`, parse custom args (for testing) |
 | `lino_parse_from_with(args, lenv, env)` | Load specified files, parse custom args |
-
-### Legacy Struct-Based Usage
-
-You can also use `getenv` helpers in `default_value` expressions with `Parser::parse()`:
-
-```rust
-use lino_arguments::{Parser, getenv, getenv_int, getenv_bool, load_lenv_file};
-
-load_lenv_file(".lenv").ok();
-
-#[derive(Parser, Debug)]
-struct Args {
-    #[arg(short, long, default_value_t = getenv_int("PORT", 3000) as u16)]
-    port: u16,
-}
-
-fn main() {
-    let args = Args::parse();
-}
-```
 
 ## Functional Usage (like JavaScript's makeConfig)
 
@@ -136,12 +139,19 @@ fn main() {
 
 ### Re-exported Clap Types
 
-- `Parser` - Derive macro for struct-based CLI parsing
+- `Parser` - Derive macro and trait for struct-based CLI parsing
 - `Args` - Derive macro for argument groups
 - `Subcommand` - Derive macro for subcommands
 - `ValueEnum` - Derive macro for enum value arguments
 - `arg!` - Macro for inline argument definitions
 - `command!` - Macro for command metadata
+
+### Initialization Functions
+
+| Function | Description |
+|----------|-------------|
+| `init()` | Load `.lenv` + `.env` files from current directory |
+| `init_with(lenv_path, env_path)` | Load specified `.lenv` and `.env` files |
 
 ### File Loading Functions
 

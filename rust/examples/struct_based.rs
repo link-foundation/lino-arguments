@@ -1,8 +1,9 @@
 //! Struct-based configuration example (drop-in clap replacement)
 //!
 //! This shows how lino-arguments works as a drop-in replacement for clap,
-//! with built-in .lenv and .env file support. Just use `LinoParser` trait
-//! and clap's `env` attribute — .lenv/.env values are loaded automatically.
+//! with built-in .lenv and .env file support. Just replace `use clap::Parser`
+//! with `use lino_arguments::Parser` and add `lino_arguments::init()` —
+//! everything else stays the same.
 //!
 //! Usage:
 //!   cargo run --example struct_based -- --port 9090 --verbose
@@ -11,11 +12,11 @@
 //! With a .lenv file containing "PORT: 8080":
 //!   cargo run --example struct_based
 
-use lino_arguments::{LinoParser, Parser};
+use lino_arguments::Parser;
 
 /// A simple web server configuration.
 ///
-/// Uses standard clap attributes — `LinoParser::lino_parse()` loads .lenv
+/// Uses standard clap attributes — `lino_arguments::init()` loads .lenv
 /// and .env files into the process environment before clap parses, so
 /// `env = "PORT"` automatically picks up values from .lenv/.env files.
 #[derive(Parser, Debug)]
@@ -41,8 +42,9 @@ struct Args {
 }
 
 fn main() {
-    // lino_parse() loads .lenv + .env, then delegates to clap's parse()
-    let args = Args::lino_parse();
+    // Drop-in: just add init() before parse()
+    lino_arguments::init();
+    let args = Args::parse();
 
     // If --configuration was provided, load that .lenv file too
     if let Some(ref config_path) = args.configuration {

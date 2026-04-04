@@ -1,9 +1,10 @@
 //! Integration tests for lino-arguments
 
 use lino_arguments::{
-    getenv, getenv_bool, getenv_int, load_env_file, load_env_file_override, load_lenv_file,
-    load_lenv_file_override, make_config_from, read_lino_env, to_camel_case, to_kebab_case,
-    to_pascal_case, to_snake_case, to_upper_case, write_lino_env, LinoEnv, LinoParser, Parser,
+    getenv, getenv_bool, getenv_int, init_with, load_env_file, load_env_file_override,
+    load_lenv_file, load_lenv_file_override, make_config_from, read_lino_env, to_camel_case,
+    to_kebab_case, to_pascal_case, to_snake_case, to_upper_case, write_lino_env, LinoEnv,
+    LinoParser, Parser,
 };
 use std::collections::HashMap;
 use std::env;
@@ -869,5 +870,248 @@ mod make_config_tests {
         });
 
         assert_eq!(config.get("port"), "8080");
+    }
+}
+
+// ============================================================================
+// init() and init_with() Tests
+// ============================================================================
+
+mod init_tests {
+    use super::*;
+
+    #[test]
+    fn test_init_with_loads_lenv_file() {
+        let dir = tempdir().unwrap();
+        let lenv_path = dir.path().join("test.lenv");
+        let lenv_path_str = lenv_path.to_str().unwrap();
+
+        fs::write(&lenv_path, "INIT_LENV_PORT_T1: 7777\n").unwrap();
+        env::remove_var("INIT_LENV_PORT_T1");
+
+        init_with(Some(lenv_path_str), None);
+
+        assert_eq!(env::var("INIT_LENV_PORT_T1").unwrap(), "7777");
+
+        env::remove_var("INIT_LENV_PORT_T1");
+    }
+
+    #[test]
+    fn test_init_with_loads_env_file() {
+        let dir = tempdir().unwrap();
+        let env_path = dir.path().join(".env");
+        let env_path_str = env_path.to_str().unwrap();
+
+        fs::write(&env_path, "INIT_ENV_HOST_T2=example.com\n").unwrap();
+        env::remove_var("INIT_ENV_HOST_T2");
+
+        init_with(None, Some(env_path_str));
+
+        assert_eq!(env::var("INIT_ENV_HOST_T2").unwrap(), "example.com");
+
+        env::remove_var("INIT_ENV_HOST_T2");
+    }
+
+    #[test]
+    fn test_init_with_loads_both_files() {
+        let dir = tempdir().unwrap();
+        let lenv_path = dir.path().join("test.lenv");
+        let lenv_path_str = lenv_path.to_str().unwrap();
+        let env_path = dir.path().join(".env");
+        let env_path_str = env_path.to_str().unwrap();
+
+        fs::write(&lenv_path, "INIT_BOTH_A_T3: from_lenv\n").unwrap();
+        fs::write(&env_path, "INIT_BOTH_B_T3=from_env\n").unwrap();
+
+        env::remove_var("INIT_BOTH_A_T3");
+        env::remove_var("INIT_BOTH_B_T3");
+
+        init_with(Some(lenv_path_str), Some(env_path_str));
+
+        assert_eq!(env::var("INIT_BOTH_A_T3").unwrap(), "from_lenv");
+        assert_eq!(env::var("INIT_BOTH_B_T3").unwrap(), "from_env");
+
+        env::remove_var("INIT_BOTH_A_T3");
+        env::remove_var("INIT_BOTH_B_T3");
+    }
+
+    #[test]
+    fn test_init_with_lenv_takes_priority_over_env() {
+        let dir = tempdir().unwrap();
+        let lenv_path = dir.path().join("test.lenv");
+        let lenv_path_str = lenv_path.to_str().unwrap();
+        let env_path = dir.path().join(".env");
+        let env_path_str = env_path.to_str().unwrap();
+
+        // Same key in both files — .lenv should win
+        fs::write(&lenv_path, "INIT_PRIO_T4: from_lenv\n").unwrap();
+        fs::write(&env_path, "INIT_PRIO_T4=from_env\n").unwrap();
+
+        env::remove_var("INIT_PRIO_T4");
+
+        init_with(Some(lenv_path_str), Some(env_path_str));
+
+        // .lenv is loaded first, so it sets the var; .env won't overwrite
+        assert_eq!(env::var("INIT_PRIO_T4").unwrap(), "from_lenv");
+
+        env::remove_var("INIT_PRIO_T4");
+    }
+
+    #[test]
+    fn test_init_with_existing_env_var_takes_priority() {
+        let dir = tempdir().unwrap();
+        let lenv_path = dir.path().join("test.lenv");
+        let lenv_path_str = lenv_path.to_str().unwrap();
+
+        fs::write(&lenv_path, "INIT_EXISTING_T5: from_lenv\n").unwrap();
+
+        // Set env var BEFORE init — it should take priority
+        env::set_var("INIT_EXISTING_T5", "from_process");
+
+        init_with(Some(lenv_path_str), None);
+
+        assert_eq!(env::var("INIT_EXISTING_T5").unwrap(), "from_process");
+
+        env::remove_var("INIT_EXISTING_T5");
+    }
+}
+
+// ============================================================================
+// Drop-in parse() Tests (init + standard clap parse)
+// ============================================================================
+
+mod dropin_parse_tests {
+    use super::*;
+
+    #[test]
+    fn test_dropin_parse_from_with_lenv() {
+        #[derive(Parser, Debug)]
+        #[command(name = "test")]
+        struct Args {
+            #[arg(long, env = "DI_LENV_PORT_T1", default_value = "3000")]
+            port: u16,
+        }
+
+        let dir = tempdir().unwrap();
+        let lenv_path = dir.path().join("test.lenv");
+        let lenv_path_str = lenv_path.to_str().unwrap();
+
+        fs::write(&lenv_path, "DI_LENV_PORT_T1: 8888\n").unwrap();
+        env::remove_var("DI_LENV_PORT_T1");
+
+        // Drop-in pattern: init_with + parse_from
+        init_with(Some(lenv_path_str), None);
+        let args = Args::parse_from(["test"]);
+
+        assert_eq!(args.port, 8888);
+
+        env::remove_var("DI_LENV_PORT_T1");
+    }
+
+    #[test]
+    fn test_dropin_parse_from_with_env_file() {
+        #[derive(Parser, Debug)]
+        #[command(name = "test")]
+        struct Args {
+            #[arg(long, env = "DI_ENV_HOST_T2", default_value = "localhost")]
+            host: String,
+        }
+
+        let dir = tempdir().unwrap();
+        let env_path = dir.path().join(".env");
+        let env_path_str = env_path.to_str().unwrap();
+
+        fs::write(&env_path, "DI_ENV_HOST_T2=example.com\n").unwrap();
+        env::remove_var("DI_ENV_HOST_T2");
+
+        init_with(None, Some(env_path_str));
+        let args = Args::parse_from(["test"]);
+
+        assert_eq!(args.host, "example.com");
+
+        env::remove_var("DI_ENV_HOST_T2");
+    }
+
+    #[test]
+    fn test_dropin_cli_overrides_env_files() {
+        #[derive(Parser, Debug)]
+        #[command(name = "test")]
+        struct Args {
+            #[arg(long, env = "DI_CLI_PORT_T3", default_value = "3000")]
+            port: u16,
+        }
+
+        let dir = tempdir().unwrap();
+        let lenv_path = dir.path().join("test.lenv");
+        let lenv_path_str = lenv_path.to_str().unwrap();
+
+        fs::write(&lenv_path, "DI_CLI_PORT_T3: 8080\n").unwrap();
+        env::remove_var("DI_CLI_PORT_T3");
+
+        init_with(Some(lenv_path_str), None);
+        let args = Args::parse_from(["test", "--port", "9999"]);
+
+        assert_eq!(args.port, 9999); // CLI wins
+
+        env::remove_var("DI_CLI_PORT_T3");
+    }
+
+    #[test]
+    fn test_dropin_full_priority_chain() {
+        #[derive(Parser, Debug)]
+        #[command(name = "test")]
+        struct Args {
+            #[arg(long, env = "DI_FPC_PORT_T4", default_value = "3000")]
+            port: u16,
+            #[arg(long, env = "DI_FPC_HOST_T4", default_value = "localhost")]
+            host: String,
+            #[arg(long, env = "DI_FPC_VERBOSE_T4")]
+            verbose: bool,
+            #[arg(long, env = "DI_FPC_WORKERS_T4", default_value = "4")]
+            workers: u16,
+        }
+
+        let dir = tempdir().unwrap();
+        let lenv_path = dir.path().join("test.lenv");
+        let lenv_path_str = lenv_path.to_str().unwrap();
+        let env_path = dir.path().join(".env");
+        let env_path_str = env_path.to_str().unwrap();
+
+        fs::write(&lenv_path, "DI_FPC_HOST_T4: from-lenv\n").unwrap();
+        fs::write(&env_path, "DI_FPC_VERBOSE_T4=true\n").unwrap();
+
+        env::remove_var("DI_FPC_PORT_T4");
+        env::remove_var("DI_FPC_HOST_T4");
+        env::remove_var("DI_FPC_VERBOSE_T4");
+        env::remove_var("DI_FPC_WORKERS_T4");
+
+        init_with(Some(lenv_path_str), Some(env_path_str));
+        let args = Args::parse_from(["test", "--port", "4000"]);
+
+        assert_eq!(args.port, 4000); // from CLI
+        assert_eq!(args.host, "from-lenv"); // from .lenv
+        assert!(args.verbose); // from .env
+        assert_eq!(args.workers, 4); // from default_value
+
+        env::remove_var("DI_FPC_HOST_T4");
+        env::remove_var("DI_FPC_VERBOSE_T4");
+    }
+
+    #[test]
+    fn test_dropin_defaults_when_no_files() {
+        #[derive(Parser, Debug)]
+        #[command(name = "test")]
+        struct Args {
+            #[arg(long, env = "DI_DEF_PORT_T5", default_value = "3000")]
+            port: u16,
+        }
+
+        env::remove_var("DI_DEF_PORT_T5");
+
+        // init_with with no files — should still work
+        init_with(None, None);
+        let args = Args::parse_from(["test"]);
+
+        assert_eq!(args.port, 3000);
     }
 }
