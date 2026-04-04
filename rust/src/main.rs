@@ -2,8 +2,7 @@
 //!
 //! This is a simple CLI example showing how to use lino-arguments.
 
-use clap::Parser;
-use lino_arguments::{getenv, getenv_bool, getenv_int, load_lenv_file};
+use lino_arguments::{getenv, getenv_bool, getenv_int, load_lenv_file, Parser};
 
 /// A unified configuration example
 #[derive(Parser, Debug)]

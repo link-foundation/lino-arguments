@@ -3,22 +3,57 @@
 //! Combines environment variables and CLI arguments into a single
 //! easy-to-use configuration system with clear priority ordering.
 //!
+//! Works like a combination of [clap](https://docs.rs/clap) and
+//! [dotenvy](https://docs.rs/dotenvy), but uses `.lenv` files via
+//! [lino-env](https://docs.rs/lino-env) instead of `.env` files.
+//!
 //! Priority (highest to lowest):
 //! 1. CLI arguments (manually entered options)
 //! 2. Environment variables (from process.env)
 //! 3. Configuration file (lenv file specified via CLI)
 //! 4. Default values
 //!
-//! # Example
+//! # Struct-Based Usage (like clap)
 //!
 //! ```rust,ignore
-//! use lino_arguments::{getenv, load_lenv_file};
+//! use lino_arguments::{Parser, getenv, getenv_int, getenv_bool, load_lenv_file};
 //!
-//! // Load variables from a .lenv file into the environment
+//! // Load .lenv file first (like dotenvy, but for .lenv format)
 //! load_lenv_file(".lenv").ok();
 //!
-//! // Now getenv will find values from the loaded file
-//! let api_key = getenv("API_KEY", "default-key");
+//! #[derive(Parser, Debug)]
+//! #[command(name = "my-app")]
+//! struct Args {
+//!     #[arg(short, long, default_value_t = getenv_int("PORT", 3000) as u16)]
+//!     port: u16,
+//!
+//!     #[arg(short = 'k', long, default_value = getenv("API_KEY", ""))]
+//!     api_key: String,
+//!
+//!     #[arg(short, long, default_value_t = getenv_bool("VERBOSE", false))]
+//!     verbose: bool,
+//! }
+//!
+//! fn main() {
+//!     let args = Args::parse();
+//!     println!("Server starting on port {}", args.port);
+//! }
+//! ```
+//!
+//! # Functional Usage (like the JavaScript API)
+//!
+//! ```rust,ignore
+//! use lino_arguments::make_config;
+//!
+//! let config = make_config(|c| {
+//!     c.lenv(".lenv")
+//!      .option("port", "Server port", "3000")
+//!      .option("api-key", "API key", "")
+//!      .flag("verbose", "Enable verbose logging")
+//! });
+//!
+//! let port: u16 = config.get("port").parse().unwrap();
+//! let verbose: bool = config.get_bool("verbose");
 //! ```
 //!
 //! # .lenv File Format
@@ -31,8 +66,20 @@
 //! DEBUG: true
 //! ```
 
+use std::collections::HashMap;
 use std::env;
 use thiserror::Error;
+
+// Re-export clap derive macros and traits for struct-based usage.
+// This allows users to use `lino_arguments::Parser` directly without
+// depending on clap as a separate dependency.
+pub use clap::{Args, Parser, Subcommand, ValueEnum};
+
+// Re-export the arg attribute macro
+pub use clap::arg;
+
+// Re-export the command macro for #[command(...)] attribute
+pub use clap::command;
 
 // Re-export lino-env for direct file operations
 pub use lino_env::{read_lino_env, write_lino_env, LinoEnv};
@@ -395,6 +442,351 @@ pub fn getenv_bool(key: &str, default: bool) -> bool {
         "false" | "0" | "no" | "off" => false,
         _ => default,
     }
+}
+
+// ============================================================================
+// Functional Configuration API (like JavaScript's makeConfig)
+// ============================================================================
+
+/// Resolved configuration values from the functional API.
+///
+/// Contains all parsed configuration values accessible by key name.
+/// Values are stored as strings and can be retrieved with type conversion.
+#[derive(Debug, Clone)]
+pub struct Config {
+    values: HashMap<String, String>,
+}
+
+impl Config {
+    /// Get a configuration value as a string.
+    /// Returns empty string if the key is not found.
+    pub fn get(&self, key: &str) -> String {
+        let camel = to_camel_case(key);
+        self.values
+            .get(&camel)
+            .or_else(|| self.values.get(key))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// Get a configuration value as an integer.
+    /// Returns the default if the key is not found or cannot be parsed.
+    pub fn get_int(&self, key: &str, default: i64) -> i64 {
+        let val = self.get(key);
+        if val.is_empty() {
+            return default;
+        }
+        val.parse().unwrap_or(default)
+    }
+
+    /// Get a configuration value as a boolean.
+    /// Accepts: "true", "false", "1", "0", "yes", "no", "on", "off" (case-insensitive).
+    /// Returns false if the key is not found.
+    pub fn get_bool(&self, key: &str) -> bool {
+        let val = self.get(key);
+        matches!(val.to_lowercase().as_str(), "true" | "1" | "yes" | "on")
+    }
+
+    /// Check if a configuration key exists.
+    pub fn has(&self, key: &str) -> bool {
+        let camel = to_camel_case(key);
+        self.values.contains_key(&camel) || self.values.contains_key(key)
+    }
+}
+
+/// Option definition for the functional configuration API.
+#[derive(Debug, Clone)]
+struct OptionDef {
+    name: String,
+    description: String,
+    default: String,
+    is_flag: bool,
+    short: Option<char>,
+}
+
+/// Builder for functional-style configuration.
+///
+/// Provides a chainable API for defining configuration options, similar to
+/// the JavaScript `makeConfig` API.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use lino_arguments::make_config;
+///
+/// let config = make_config(|c| {
+///     c.lenv(".lenv")
+///      .option("port", "Server port", "3000")
+///      .option_short("api-key", 'k', "API key", "")
+///      .flag("verbose", "Enable verbose logging")
+/// });
+/// ```
+pub struct ConfigBuilder {
+    options: Vec<OptionDef>,
+    lenv_path: Option<String>,
+    lenv_override: bool,
+    app_name: Option<String>,
+    app_about: Option<String>,
+    app_version: Option<String>,
+}
+
+impl ConfigBuilder {
+    fn new() -> Self {
+        ConfigBuilder {
+            options: Vec::new(),
+            lenv_path: None,
+            lenv_override: false,
+            app_name: None,
+            app_about: None,
+            app_version: None,
+        }
+    }
+
+    /// Set the application name for help text.
+    pub fn name(&mut self, name: &str) -> &mut Self {
+        self.app_name = Some(name.to_string());
+        self
+    }
+
+    /// Set the application description for help text.
+    pub fn about(&mut self, about: &str) -> &mut Self {
+        self.app_about = Some(about.to_string());
+        self
+    }
+
+    /// Set the application version for --version flag.
+    pub fn version(&mut self, version: &str) -> &mut Self {
+        self.app_version = Some(version.to_string());
+        self
+    }
+
+    /// Load a .lenv configuration file (without overriding existing env vars).
+    pub fn lenv(&mut self, path: &str) -> &mut Self {
+        self.lenv_path = Some(path.to_string());
+        self.lenv_override = false;
+        self
+    }
+
+    /// Load a .lenv configuration file, overriding existing env vars.
+    pub fn lenv_override(&mut self, path: &str) -> &mut Self {
+        self.lenv_path = Some(path.to_string());
+        self.lenv_override = true;
+        self
+    }
+
+    /// Define a string/number option with a long name, description, and default value.
+    pub fn option(&mut self, name: &str, description: &str, default: &str) -> &mut Self {
+        self.options.push(OptionDef {
+            name: name.to_string(),
+            description: description.to_string(),
+            default: default.to_string(),
+            is_flag: false,
+            short: None,
+        });
+        self
+    }
+
+    /// Define a string/number option with both short and long names.
+    pub fn option_short(
+        &mut self,
+        name: &str,
+        short: char,
+        description: &str,
+        default: &str,
+    ) -> &mut Self {
+        self.options.push(OptionDef {
+            name: name.to_string(),
+            description: description.to_string(),
+            default: default.to_string(),
+            is_flag: false,
+            short: Some(short),
+        });
+        self
+    }
+
+    /// Define a boolean flag (defaults to false).
+    pub fn flag(&mut self, name: &str, description: &str) -> &mut Self {
+        self.options.push(OptionDef {
+            name: name.to_string(),
+            description: description.to_string(),
+            default: String::new(),
+            is_flag: true,
+            short: None,
+        });
+        self
+    }
+
+    /// Define a boolean flag with a short name.
+    pub fn flag_short(&mut self, name: &str, short: char, description: &str) -> &mut Self {
+        self.options.push(OptionDef {
+            name: name.to_string(),
+            description: description.to_string(),
+            default: String::new(),
+            is_flag: true,
+            short: Some(short),
+        });
+        self
+    }
+
+    /// Build the configuration from the defined options.
+    ///
+    /// This parses CLI arguments using clap and resolves values from:
+    /// 1. CLI arguments (highest priority)
+    /// 2. Environment variables
+    /// 3. .lenv file
+    /// 4. Default values (lowest priority)
+    fn build(&self) -> Config {
+        self.build_from(env::args_os().collect())
+    }
+
+    /// Build the configuration from custom arguments (for testing).
+    fn build_from(&self, args: Vec<std::ffi::OsString>) -> Config {
+        // Step 1: Load .lenv file if configured
+        if let Some(ref path) = self.lenv_path {
+            if self.lenv_override {
+                let _ = load_lenv_file_override(path);
+            } else {
+                let _ = load_lenv_file(path);
+            }
+        }
+
+        // Step 2: Build clap command dynamically
+        let mut cmd = clap::Command::new(
+            self.app_name.clone().unwrap_or_else(|| "app".to_string()),
+        );
+
+        if let Some(ref about) = self.app_about {
+            cmd = cmd.about(about.clone());
+        }
+
+        if let Some(ref version) = self.app_version {
+            cmd = cmd.version(version.clone());
+        }
+
+        // Add --configuration option for dynamic .lenv loading
+        cmd = cmd.arg(
+            clap::Arg::new("configuration")
+                .long("configuration")
+                .short('c')
+                .help("Path to configuration .lenv file")
+                .value_name("PATH"),
+        );
+
+        // Add user-defined options
+        for opt in &self.options {
+            let kebab_name = to_kebab_case(&opt.name);
+
+            let mut arg = clap::Arg::new(kebab_name.clone()).long(kebab_name.clone());
+
+            // Set help text
+            arg = arg.help(opt.description.clone());
+
+            if let Some(short) = opt.short {
+                arg = arg.short(short);
+            }
+
+            if opt.is_flag {
+                arg = arg.action(clap::ArgAction::SetTrue);
+            } else {
+                // Resolve default: env var (with case-insensitive lookup) > .lenv > default
+                let env_default = getenv(&opt.name, &opt.default);
+                arg = arg.default_value(env_default);
+            }
+
+            cmd = cmd.arg(arg);
+        }
+
+        // Step 3: Parse arguments
+        let matches = cmd.get_matches_from(args);
+
+        // Step 4: Load --configuration file if provided
+        if let Some(config_path) = matches.get_one::<String>("configuration") {
+            let _ = load_lenv_file_override(config_path);
+        }
+
+        // Step 5: Collect values into Config
+        let mut values = HashMap::new();
+
+        for opt in &self.options {
+            let kebab_name = to_kebab_case(&opt.name);
+            let camel_name = to_camel_case(&opt.name);
+
+            if opt.is_flag {
+                let val = matches.get_flag(&kebab_name);
+                values.insert(camel_name, val.to_string());
+            } else if let Some(val) = matches.get_one::<String>(&kebab_name) {
+                values.insert(camel_name, val.clone());
+            }
+        }
+
+        Config { values }
+    }
+}
+
+/// Create a unified configuration using a functional builder API.
+///
+/// This is the Rust equivalent of the JavaScript `makeConfig` function.
+/// It combines .lenv file loading, environment variables, and CLI argument
+/// parsing into a single configuration step.
+///
+/// Priority (highest to lowest):
+/// 1. CLI arguments
+/// 2. Environment variables
+/// 3. .lenv file (via `--configuration` flag or builder `.lenv()`)
+/// 4. Default values
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use lino_arguments::make_config;
+///
+/// let config = make_config(|c| {
+///     c.lenv(".lenv")
+///      .option("port", "Server port", "3000")
+///      .option_short("api-key", 'k', "API key", "")
+///      .flag("verbose", "Enable verbose logging")
+/// });
+///
+/// let port: u16 = config.get("port").parse().unwrap();
+/// let api_key = config.get("api-key");
+/// let verbose = config.get_bool("verbose");
+/// ```
+pub fn make_config<F>(configure: F) -> Config
+where
+    F: FnOnce(&mut ConfigBuilder) -> &mut ConfigBuilder,
+{
+    let mut builder = ConfigBuilder::new();
+    configure(&mut builder);
+    builder.build()
+}
+
+/// Create a unified configuration using a functional builder API with custom arguments.
+///
+/// Same as `make_config` but accepts custom arguments for testing purposes.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use lino_arguments::make_config_from;
+///
+/// let args = vec!["my-app", "--port", "9090", "--verbose"];
+/// let config = make_config_from(args, |c| {
+///     c.option("port", "Server port", "3000")
+///      .flag("verbose", "Enable verbose logging")
+/// });
+///
+/// assert_eq!(config.get("port"), "9090");
+/// assert!(config.get_bool("verbose"));
+/// ```
+pub fn make_config_from<I, T, F>(args: I, configure: F) -> Config
+where
+    I: IntoIterator<Item = T>,
+    T: Into<std::ffi::OsString>,
+    F: FnOnce(&mut ConfigBuilder) -> &mut ConfigBuilder,
+{
+    let mut builder = ConfigBuilder::new();
+    configure(&mut builder);
+    builder.build_from(args.into_iter().map(|a| a.into()).collect())
 }
 
 // ============================================================================
