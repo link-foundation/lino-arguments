@@ -1,9 +1,9 @@
 //! Integration tests for lino-arguments
 
 use lino_arguments::{
-    getenv, getenv_bool, getenv_int, load_lenv_file, load_lenv_file_override, read_lino_env,
-    to_camel_case, to_kebab_case, to_pascal_case, to_snake_case, to_upper_case, write_lino_env,
-    LinoEnv,
+    getenv, getenv_bool, getenv_int, load_lenv_file, load_lenv_file_override, make_config_from,
+    read_lino_env, to_camel_case, to_kebab_case, to_pascal_case, to_snake_case, to_upper_case,
+    write_lino_env, LinoEnv, Parser,
 };
 use std::collections::HashMap;
 use std::env;
@@ -309,5 +309,213 @@ mod getenv_with_lenv {
 
         // Cleanup
         env::remove_var("LINO_TEST_INTEGRATION_VAR");
+    }
+}
+
+// ============================================================================
+// Clap Re-export Tests
+// ============================================================================
+
+mod clap_reexport {
+    use super::*;
+
+    /// Verify that the Parser derive macro works through lino-arguments re-export
+    #[derive(Parser, Debug)]
+    #[command(name = "test-app")]
+    struct TestArgs {
+        #[arg(short, long, default_value = "3000")]
+        port: String,
+
+        #[arg(short, long)]
+        verbose: bool,
+    }
+
+    #[test]
+    fn test_parser_derive_works() {
+        // Parse with explicit args (simulating CLI)
+        let args = TestArgs::parse_from(["test-app", "--port", "8080", "--verbose"]);
+        assert_eq!(args.port, "8080");
+        assert!(args.verbose);
+    }
+
+    #[test]
+    fn test_parser_defaults_work() {
+        let args = TestArgs::parse_from(["test-app"]);
+        assert_eq!(args.port, "3000");
+        assert!(!args.verbose);
+    }
+}
+
+// ============================================================================
+// Functional make_config API Tests
+// ============================================================================
+
+mod make_config_tests {
+    use super::*;
+
+    #[test]
+    fn test_make_config_basic_options() {
+        let config = make_config_from(["app", "--port", "9090"], |c| {
+            c.option("port", "Server port", "3000")
+        });
+
+        assert_eq!(config.get("port"), "9090");
+    }
+
+    #[test]
+    fn test_make_config_default_values() {
+        let config = make_config_from(["app"], |c| {
+            c.option("port", "Server port", "3000")
+                .option("host", "Server host", "localhost")
+        });
+
+        assert_eq!(config.get("port"), "3000");
+        assert_eq!(config.get("host"), "localhost");
+    }
+
+    #[test]
+    fn test_make_config_flags() {
+        let config = make_config_from(["app", "--verbose"], |c| {
+            c.flag("verbose", "Enable verbose logging")
+        });
+
+        assert!(config.get_bool("verbose"));
+    }
+
+    #[test]
+    fn test_make_config_flag_default_false() {
+        let config = make_config_from(["app"], |c| {
+            c.flag("verbose", "Enable verbose logging")
+        });
+
+        assert!(!config.get_bool("verbose"));
+    }
+
+    #[test]
+    fn test_make_config_short_options() {
+        let config = make_config_from(["app", "-p", "4000"], |c| {
+            c.option_short("port", 'p', "Server port", "3000")
+        });
+
+        assert_eq!(config.get("port"), "4000");
+    }
+
+    #[test]
+    fn test_make_config_short_flags() {
+        let config = make_config_from(["app", "-v"], |c| {
+            c.flag_short("verbose", 'v', "Enable verbose logging")
+        });
+
+        assert!(config.get_bool("verbose"));
+    }
+
+    #[test]
+    fn test_make_config_get_int() {
+        let config = make_config_from(["app", "--port", "8080"], |c| {
+            c.option("port", "Server port", "3000")
+        });
+
+        assert_eq!(config.get_int("port", 3000), 8080);
+    }
+
+    #[test]
+    fn test_make_config_get_int_default() {
+        let config = make_config_from(["app"], |c| {
+            c.option("retries", "Retry count", "")
+        });
+
+        assert_eq!(config.get_int("retries", 5), 5);
+    }
+
+    #[test]
+    fn test_make_config_has() {
+        let config = make_config_from(["app", "--port", "8080"], |c| {
+            c.option("port", "Server port", "3000")
+        });
+
+        assert!(config.has("port"));
+        assert!(!config.has("nonexistent"));
+    }
+
+    #[test]
+    fn test_make_config_kebab_case_to_camel() {
+        let config = make_config_from(["app", "--api-key", "secret123"], |c| {
+            c.option("api-key", "API key", "")
+        });
+
+        // Access via kebab-case should work (converted to camelCase internally)
+        assert_eq!(config.get("api-key"), "secret123");
+        assert_eq!(config.get("apiKey"), "secret123");
+    }
+
+    #[test]
+    fn test_make_config_with_lenv_file() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_make_config.lenv");
+        let file_path_str = file_path.to_str().unwrap();
+
+        fs::write(&file_path, "PORT: 7070\n").unwrap();
+
+        // Ensure env var doesn't exist
+        env::remove_var("PORT");
+
+        let config = make_config_from(["app"], |c| {
+            c.lenv(file_path_str)
+                .option("port", "Server port", "3000")
+        });
+
+        assert_eq!(config.get("port"), "7070");
+
+        env::remove_var("PORT");
+    }
+
+    #[test]
+    fn test_make_config_cli_overrides_lenv() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_override.lenv");
+        let file_path_str = file_path.to_str().unwrap();
+
+        fs::write(&file_path, "PORT: 7070\n").unwrap();
+
+        // Ensure env var doesn't exist
+        env::remove_var("PORT");
+
+        let config = make_config_from(["app", "--port", "9999"], |c| {
+            c.lenv(file_path_str)
+                .option("port", "Server port", "3000")
+        });
+
+        // CLI should override .lenv value
+        assert_eq!(config.get("port"), "9999");
+
+        env::remove_var("PORT");
+    }
+
+    #[test]
+    fn test_make_config_multiple_options_and_flags() {
+        let config = make_config_from(
+            ["app", "--port", "8080", "--api-key", "secret", "--verbose"],
+            |c| {
+                c.option("port", "Server port", "3000")
+                    .option("api-key", "API key", "")
+                    .flag("verbose", "Enable verbose logging")
+            },
+        );
+
+        assert_eq!(config.get("port"), "8080");
+        assert_eq!(config.get("apiKey"), "secret");
+        assert!(config.get_bool("verbose"));
+    }
+
+    #[test]
+    fn test_make_config_app_metadata() {
+        let config = make_config_from(["my-app", "--port", "8080"], |c| {
+            c.name("my-app")
+                .about("A test application")
+                .version("1.0.0")
+                .option("port", "Server port", "3000")
+        });
+
+        assert_eq!(config.get("port"), "8080");
     }
 }
