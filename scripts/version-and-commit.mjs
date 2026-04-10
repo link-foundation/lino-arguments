@@ -41,6 +41,8 @@ const getArg = (name, defaultValue) => {
 
 const bumpType = getArg('bump-type', process.env.BUMP_TYPE || '');
 const description = getArg('description', process.env.DESCRIPTION || '');
+const tagPrefix = getArg('tag-prefix', process.env.TAG_PREFIX || 'v');
+const releaseLabel = getArg('release-label', process.env.RELEASE_LABEL || '');
 
 // Get Rust package root (auto-detect or use explicit config)
 const rustRootConfig = parseRustRootConfig();
@@ -144,7 +146,7 @@ function updateCargoToml(newVersion) {
  */
 function checkTagExists(version) {
   try {
-    exec(`git rev-parse v${version}`, { stdio: 'ignore' });
+    exec(`git rev-parse ${tagPrefix}${version}`, { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -234,7 +236,7 @@ function main() {
 
     // Check if this version was already released
     if (checkTagExists(newVersion)) {
-      console.log(`Tag v${newVersion} already exists`);
+      console.log(`Tag ${tagPrefix}${newVersion} already exists`);
       setOutput('already_released', 'true');
       setOutput('new_version', newVersion);
       return;
@@ -266,18 +268,21 @@ function main() {
     }
 
     // Commit changes
+    const labelStr = releaseLabel ? `(${releaseLabel}) ` : '';
     const commitMsg = description
-      ? `chore: release v${newVersion}\n\n${description}`
-      : `chore: release v${newVersion}`;
+      ? `chore: release ${labelStr}${tagPrefix}${newVersion}\n\n${description}`
+      : `chore: release ${labelStr}${tagPrefix}${newVersion}`;
     exec(`git commit -m "${commitMsg.replace(/"/g, '\\"')}"`);
     console.log(`Committed version ${newVersion}`);
 
-    // Create tag
+    // Create tag with language-specific prefix
+    const tagName = `${tagPrefix}${newVersion}`;
+    const displayName = releaseLabel ? `[${releaseLabel}] ${newVersion}` : `${tagPrefix}${newVersion}`;
     const tagMsg = description
-      ? `Release v${newVersion}\n\n${description}`
-      : `Release v${newVersion}`;
-    exec(`git tag -a v${newVersion} -m "${tagMsg.replace(/"/g, '\\"')}"`);
-    console.log(`Created tag v${newVersion}`);
+      ? `Release ${displayName}\n\n${description}`
+      : `Release ${displayName}`;
+    exec(`git tag -a ${tagName} -m "${tagMsg.replace(/"/g, '\\"')}"`);
+    console.log(`Created tag ${tagName}`);
 
     // Push changes and tag
     exec('git push');

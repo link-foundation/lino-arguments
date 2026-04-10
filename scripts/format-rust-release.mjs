@@ -32,6 +32,7 @@ const getArg = (name, defaultValue = '') => {
 
 const version = getArg('release-version', process.env.VERSION || '');
 const repository = getArg('repository', process.env.REPOSITORY || '');
+const tagPrefix = getArg('tag-prefix', process.env.TAG_PREFIX || 'rust_');
 // Default crate name derived from repo name (last segment)
 const defaultCrateName = repository.split('/').pop() || '';
 const crateName = getArg('crate-name', process.env.CRATE_NAME || defaultCrateName);
@@ -44,8 +45,8 @@ if (!version || !repository) {
   process.exit(1);
 }
 
-const versionWithoutV = version.replace(/^v/, '');
-const tag = `v${versionWithoutV}`;
+const versionWithoutV = version.replace(/^v/, '').replace(/^rust_/, '');
+const tag = `${tagPrefix}${versionWithoutV}`;
 
 // ---------------------------------------------------------------------------
 // Shields.io badges for Rust

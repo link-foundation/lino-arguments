@@ -289,7 +289,7 @@ jobs:
       - name: Version packages and commit to main
         if: steps.check_changesets.outputs.has_changesets == 'true'
         id: version
-        run: node ../scripts/version-and-commit.mjs --mode changeset
+        run: node ../scripts/version-and-commit.mjs --mode changeset --tag-prefix "js_" --release-label "JavaScript"
 
       - name: Publish to npm
         if: steps.version.outputs.version_committed == 'true' || steps.version.outputs.already_released == 'true'
@@ -300,13 +300,13 @@ jobs:
         if: steps.publish.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node ../scripts/create-github-release.mjs --release-version "${{ steps.publish.outputs.published_version }}" --repository "${{ github.repository }}"
+        run: node ../scripts/create-github-release.mjs --release-version "${{ steps.publish.outputs.published_version }}" --repository "${{ github.repository }}" --tag-prefix "js_" --release-label "JavaScript"
 
       - name: Format GitHub release notes
         if: steps.publish.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node ../scripts/format-github-release.mjs --release-version "${{ steps.publish.outputs.published_version }}" --repository "${{ github.repository }}" --commit-sha "${{ github.sha }}"
+        run: node ../scripts/format-github-release.mjs --release-version "${{ steps.publish.outputs.published_version }}" --repository "${{ github.repository }}" --commit-sha "${{ github.sha }}" --tag-prefix "js_"
 
   # Manual Instant Release
   instant-release:
@@ -336,7 +336,7 @@ jobs:
 
       - name: Version packages and commit to main
         id: version
-        run: node ../scripts/version-and-commit.mjs --mode instant --bump-type "${{ github.event.inputs.bump_type }}" --description "${{ github.event.inputs.description }}"
+        run: node ../scripts/version-and-commit.mjs --mode instant --bump-type "${{ github.event.inputs.bump_type }}" --description "${{ github.event.inputs.description }}" --tag-prefix "js_" --release-label "JavaScript"
 
       - name: Publish to npm
         if: steps.version.outputs.version_committed == 'true' || steps.version.outputs.already_released == 'true'
@@ -347,13 +347,13 @@ jobs:
         if: steps.publish.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node ../scripts/create-github-release.mjs --release-version "${{ steps.publish.outputs.published_version }}" --repository "${{ github.repository }}"
+        run: node ../scripts/create-github-release.mjs --release-version "${{ steps.publish.outputs.published_version }}" --repository "${{ github.repository }}" --tag-prefix "js_" --release-label "JavaScript"
 
       - name: Format GitHub release notes
         if: steps.publish.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node ../scripts/format-github-release.mjs --release-version "${{ steps.publish.outputs.published_version }}" --repository "${{ github.repository }}" --commit-sha "${{ github.sha }}"
+        run: node ../scripts/format-github-release.mjs --release-version "${{ steps.publish.outputs.published_version }}" --repository "${{ github.repository }}" --commit-sha "${{ github.sha }}" --tag-prefix "js_"
 
   # Manual Changeset PR
   changeset-pr:
