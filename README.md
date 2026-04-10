@@ -40,11 +40,14 @@ See [js/README.md](js/) for full documentation.
 
 ### Rust
 
+[![Crates.io](https://img.shields.io/crates/v/lino-arguments.svg)](https://crates.io/crates/lino-arguments)
+[![docs.rs](https://img.shields.io/docsrs/lino-arguments)](https://docs.rs/lino-arguments)
+
 The Rust version uses clap for argument parsing.
 
 ```toml
 [dependencies]
-lino-arguments = "0.1"
+lino-arguments = "0.2"
 ```
 
 ```rust

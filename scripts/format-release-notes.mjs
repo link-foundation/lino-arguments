@@ -1,20 +1,48 @@
 #!/usr/bin/env node
 
 /**
- * Script to format GitHub release notes with proper formatting:
+ * Script to format JavaScript GitHub release notes with proper formatting:
  * - Fix special characters like \n
  * - Add link to PR with changeset (if available)
  * - Add shields.io NPM version badge
  * - Format nicely with proper markdown
+ *
+ * Usage (named flags – preferred):
+ *   node scripts/format-release-notes.mjs \
+ *     --release-id <id> \
+ *     --release-version <version> \
+ *     --repository <owner/repo> \
+ *     [--commit-sha <sha>]
+ *
+ * Legacy positional usage (deprecated):
+ *   node scripts/format-release-notes.mjs <releaseId> <version> <repository>
  */
 
 import { execSync } from 'child_process';
 
-const [, , releaseId, version, repository] = process.argv;
+// ---------------------------------------------------------------------------
+// Argument parsing – support both named flags and legacy positional args
+// ---------------------------------------------------------------------------
+const rawArgs = process.argv.slice(2);
+const getNamedArg = (name) => {
+  const idx = rawArgs.indexOf(`--${name}`);
+  return idx >= 0 && rawArgs[idx + 1] ? rawArgs[idx + 1] : null;
+};
+
+// Named flags take priority; fall back to positional args for compatibility
+const releaseId =
+  getNamedArg('release-id') ??
+  (rawArgs[0] && !rawArgs[0].startsWith('--') ? rawArgs[0] : null);
+const version =
+  getNamedArg('release-version') ??
+  (rawArgs[1] && !rawArgs[1].startsWith('--') ? rawArgs[1] : null);
+const repository =
+  getNamedArg('repository') ??
+  (rawArgs[2] && !rawArgs[2].startsWith('--') ? rawArgs[2] : null);
 
 if (!releaseId || !version || !repository) {
   console.error(
-    'Usage: format-release-notes.mjs <releaseId> <version> <repository>'
+    'Usage: format-release-notes.mjs --release-id <id> --release-version <version> --repository <owner/repo>'
   );
   process.exit(1);
 }
