@@ -1,3 +1,8 @@
+# IMPORTANT: npm trusted publishing (OIDC) requires this workflow filename to match
+# the "Workflow" field configured in npm package settings at npmjs.com.
+# Currently configured as: js.yml (for link-foundation/lino-arguments)
+# If you rename this file, update the npm trusted publisher config accordingly.
+# See: docs/case-studies/issue-31/case-study.md
 name: JavaScript CI/CD
 
 on:
