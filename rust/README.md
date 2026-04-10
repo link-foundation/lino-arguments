@@ -2,6 +2,9 @@
 
 A unified configuration library combining environment variables and CLI arguments with a clear priority chain. Works like a combination of [clap](https://docs.rs/clap) and [dotenvy](https://docs.rs/dotenvy), but uses `.lenv` files via [lino-env](https://docs.rs/lino-env).
 
+[![Crates.io](https://img.shields.io/crates/v/lino-arguments.svg)](https://crates.io/crates/lino-arguments)
+[![docs.rs](https://img.shields.io/docsrs/lino-arguments)](https://docs.rs/lino-arguments)
+[![Rust CI](https://github.com/link-foundation/lino-arguments/actions/workflows/rust.yml/badge.svg)](https://github.com/link-foundation/lino-arguments/actions/workflows/rust.yml)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
 
 ## Overview
