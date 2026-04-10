@@ -24,6 +24,7 @@
 
 import { readFileSync, appendFileSync } from 'fs';
 import { execSync } from 'child_process';
+import https from 'https';
 import {
   getRustRoot,
   getCargoTomlPath,
@@ -38,6 +39,7 @@ const getArg = (name, defaultValue) => {
 };
 
 const hasFragments = getArg('has-fragments', process.env.HAS_FRAGMENTS || 'false');
+const tagPrefix = getArg('tag-prefix', process.env.TAG_PREFIX || 'v');
 
 // Get Rust package root (auto-detect or use explicit config)
 const rustRootConfig = parseRustRootConfig();
@@ -78,34 +80,86 @@ function getCurrentVersion() {
 /**
  * Check if a git tag exists for this version
  * @param {string} version
+ * @param {string} prefix - Tag prefix (default: "v")
  * @returns {boolean}
  */
-function checkTagExists(version) {
+function checkTagExists(version, prefix = 'v') {
   try {
-    execSync(`git rev-parse v${version}`, { stdio: 'ignore' });
+    execSync(`git rev-parse ${prefix}${version}`, { stdio: 'ignore' });
     return true;
   } catch {
     return false;
   }
 }
 
-function main() {
+/**
+ * Get package name from Cargo.toml
+ * @returns {string}
+ */
+function getPackageName() {
+  const cargoToml = readFileSync(CARGO_TOML, 'utf-8');
+  const match = cargoToml.match(/^name\s*=\s*"([^"]+)"/m);
+  return match ? match[1] : '';
+}
+
+/**
+ * Check if a version already exists on crates.io
+ * @param {string} crateName
+ * @param {string} version
+ * @returns {Promise<boolean>}
+ */
+function checkCratesIoVersion(crateName, version) {
+  return new Promise((resolve) => {
+    try {
+      const response = execSync(
+        `curl -s -o /dev/null -w "%{http_code}" https://crates.io/api/v1/crates/${crateName}/${version}`,
+        { encoding: 'utf-8' }
+      ).trim();
+      resolve(response === '200');
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+async function main() {
   try {
     const fragmentsExist = hasFragments === 'true';
 
     if (!fragmentsExist) {
-      // No fragments - check if current version tag exists
+      // No fragments - check if current version is already published
       const currentVersion = getCurrentVersion();
-      const tagExists = checkTagExists(currentVersion);
+      const packageName = getPackageName();
 
-      if (tagExists) {
+      // Check both: git tag existence AND crates.io publication
+      const tagExists = checkTagExists(currentVersion, tagPrefix);
+      const publishedOnCratesIo = packageName ? await checkCratesIoVersion(packageName, currentVersion) : false;
+
+      console.log(`Version: ${currentVersion}`);
+      console.log(`Tag exists: ${tagExists}`);
+      console.log(`Published on crates.io: ${publishedOnCratesIo}`);
+
+      if (tagExists && publishedOnCratesIo) {
         console.log(
-          `No changelog fragments and v${currentVersion} already released`
+          `No changelog fragments and ${currentVersion} already released and published`
+        );
+        setOutput('should_release', 'false');
+      } else if (tagExists && !publishedOnCratesIo) {
+        // Tag exists but not published — need to publish without bumping
+        console.log(
+          `Tag exists but ${currentVersion} not published on crates.io — will publish`
+        );
+        setOutput('should_release', 'true');
+        setOutput('skip_bump', 'true');
+      } else if (!tagExists && publishedOnCratesIo) {
+        // Published but no tag — skip (don't try to re-publish)
+        console.log(
+          `${currentVersion} already published on crates.io (tag missing) — skipping`
         );
         setOutput('should_release', 'false');
       } else {
         console.log(
-          `No changelog fragments but v${currentVersion} not yet released`
+          `No changelog fragments but ${currentVersion} not yet released`
         );
         setOutput('should_release', 'true');
         setOutput('skip_bump', 'true');

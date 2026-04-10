@@ -63,17 +63,18 @@ async function main() {
       await $`git pull origin main`;
     }
 
-    // Get current version
+    // Get current version and package name
     const packageJson = JSON.parse(readFileSync('./package.json', 'utf8'));
     const currentVersion = packageJson.version;
-    console.log(`Current version to publish: ${currentVersion}`);
+    const PACKAGE_NAME = packageJson.name;
+    console.log(`Current version to publish: ${PACKAGE_NAME}@${currentVersion}`);
 
     // Check if this version is already published on npm
     console.log(
       `Checking if version ${currentVersion} is already published...`
     );
     const checkResult =
-      await $`npm view "test-anywhere@${currentVersion}" version`.run({
+      await $`npm view "${PACKAGE_NAME}@${currentVersion}" version`.run({
         capture: true,
       });
 
@@ -99,7 +100,7 @@ async function main() {
         await $`npm run changeset:publish`;
         setOutput('published', 'true');
         setOutput('published_version', currentVersion);
-        console.log(`\u2705 Published test-anywhere@${currentVersion} to npm`);
+        console.log(`\u2705 Published ${PACKAGE_NAME}@${currentVersion} to npm`);
         return;
       } catch {
         if (i < MAX_RETRIES) {

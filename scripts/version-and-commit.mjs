@@ -41,6 +41,9 @@ const getArg = (name, defaultValue) => {
 
 const bumpType = getArg('bump-type', process.env.BUMP_TYPE || '');
 const description = getArg('description', process.env.DESCRIPTION || '');
+const tagPrefix = getArg('tag-prefix', process.env.TAG_PREFIX || 'v');
+const releaseLabel = getArg('release-label', process.env.RELEASE_LABEL || '');
+const mode = getArg('mode', process.env.VERSION_MODE || 'rust');
 
 // Get Rust package root (auto-detect or use explicit config)
 const rustRootConfig = parseRustRootConfig();
@@ -51,7 +54,8 @@ const CARGO_TOML = getCargoTomlPath({ rustRoot });
 const CHANGELOG_DIR = getChangelogDir({ rustRoot });
 const CHANGELOG_FILE = getChangelogPath({ rustRoot });
 
-if (!bumpType || !['major', 'minor', 'patch'].includes(bumpType)) {
+// In changeset mode, bump type is determined by changesets, not required as input
+if (mode !== 'changeset' && mode !== 'instant' && (!bumpType || !['major', 'minor', 'patch'].includes(bumpType))) {
   console.error(
     'Usage: node scripts/version-and-commit.mjs --bump-type <major|minor|patch> [--description <desc>] [--rust-root <path>]'
   );
@@ -144,7 +148,7 @@ function updateCargoToml(newVersion) {
  */
 function checkTagExists(version) {
   try {
-    exec(`git rev-parse v${version}`, { stdio: 'ignore' });
+    exec(`git rev-parse ${tagPrefix}${version}`, { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -223,7 +227,85 @@ function collectChangelog(version) {
   console.log(`Collected ${files.length} changelog fragment(s)`);
 }
 
-function main() {
+/**
+ * Get version from package.json (for changeset mode)
+ * @returns {string}
+ */
+function getPackageJsonVersion() {
+  const pkgPath = existsSync('package.json') ? 'package.json' : 'js/package.json';
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+  return pkg.version;
+}
+
+/**
+ * Run changeset-based version bump and commit (JavaScript mode)
+ */
+function mainChangeset() {
+  try {
+    // Configure git
+    exec('git config user.name "github-actions[bot]"');
+    exec('git config user.email "github-actions[bot]@users.noreply.github.com"');
+
+    // Run changeset version to apply version bumps
+    const cwd = existsSync('package.json') ? '.' : 'js';
+    exec(`npm run changeset:version`, { cwd, stdio: 'inherit' });
+
+    // Get the new version after changeset version
+    const newVersion = getPackageJsonVersion();
+
+    // Check if this version was already released
+    if (checkTagExists(newVersion)) {
+      console.log(`Tag ${tagPrefix}${newVersion} already exists`);
+      setOutput('already_released', 'true');
+      setOutput('new_version', newVersion);
+      setOutput('version_committed', 'false');
+      return;
+    }
+
+    // Stage all changes made by changeset version
+    exec('git add -A');
+
+    // Check if there are changes to commit
+    try {
+      exec('git diff --cached --quiet', { stdio: 'ignore' });
+      console.log('No changes to commit');
+      setOutput('version_committed', 'false');
+      setOutput('new_version', newVersion);
+      return;
+    } catch {
+      // There are changes to commit
+    }
+
+    // Commit changes
+    const labelStr = releaseLabel ? `(${releaseLabel}) ` : '';
+    const commitMsg = `chore: release ${labelStr}${tagPrefix}${newVersion}`;
+    exec(`git commit -m "${commitMsg.replace(/"/g, '\\"')}"`);
+    console.log(`Committed version ${newVersion}`);
+
+    // Create tag with language-specific prefix
+    const tagName = `${tagPrefix}${newVersion}`;
+    const displayName = releaseLabel ? `[${releaseLabel}] ${newVersion}` : `${tagPrefix}${newVersion}`;
+    const tagMsg = `Release ${displayName}`;
+    exec(`git tag -a ${tagName} -m "${tagMsg.replace(/"/g, '\\"')}"`);
+    console.log(`Created tag ${tagName}`);
+
+    // Push changes and tag
+    exec('git push');
+    exec('git push --tags');
+    console.log('Pushed changes and tags');
+
+    setOutput('version_committed', 'true');
+    setOutput('new_version', newVersion);
+  } catch (error) {
+    console.error('Error:', error.message);
+    process.exit(1);
+  }
+}
+
+/**
+ * Run Cargo.toml-based version bump and commit (Rust mode)
+ */
+function mainRust() {
   try {
     // Configure git
     exec('git config user.name "github-actions[bot]"');
@@ -234,7 +316,7 @@ function main() {
 
     // Check if this version was already released
     if (checkTagExists(newVersion)) {
-      console.log(`Tag v${newVersion} already exists`);
+      console.log(`Tag ${tagPrefix}${newVersion} already exists`);
       setOutput('already_released', 'true');
       setOutput('new_version', newVersion);
       return;
@@ -266,18 +348,21 @@ function main() {
     }
 
     // Commit changes
+    const labelStr = releaseLabel ? `(${releaseLabel}) ` : '';
     const commitMsg = description
-      ? `chore: release v${newVersion}\n\n${description}`
-      : `chore: release v${newVersion}`;
+      ? `chore: release ${labelStr}${tagPrefix}${newVersion}\n\n${description}`
+      : `chore: release ${labelStr}${tagPrefix}${newVersion}`;
     exec(`git commit -m "${commitMsg.replace(/"/g, '\\"')}"`);
     console.log(`Committed version ${newVersion}`);
 
-    // Create tag
+    // Create tag with language-specific prefix
+    const tagName = `${tagPrefix}${newVersion}`;
+    const displayName = releaseLabel ? `[${releaseLabel}] ${newVersion}` : `${tagPrefix}${newVersion}`;
     const tagMsg = description
-      ? `Release v${newVersion}\n\n${description}`
-      : `Release v${newVersion}`;
-    exec(`git tag -a v${newVersion} -m "${tagMsg.replace(/"/g, '\\"')}"`);
-    console.log(`Created tag v${newVersion}`);
+      ? `Release ${displayName}\n\n${description}`
+      : `Release ${displayName}`;
+    exec(`git tag -a ${tagName} -m "${tagMsg.replace(/"/g, '\\"')}"`);
+    console.log(`Created tag ${tagName}`);
 
     // Push changes and tag
     exec('git push');
@@ -292,4 +377,83 @@ function main() {
   }
 }
 
-main();
+/**
+ * Run instant JS version bump (npm version) and commit
+ */
+function mainInstantJs() {
+  try {
+    // Configure git
+    exec('git config user.name "github-actions[bot]"');
+    exec('git config user.email "github-actions[bot]@users.noreply.github.com"');
+
+    if (!bumpType || !['major', 'minor', 'patch'].includes(bumpType)) {
+      console.error('Error: --bump-type is required for instant mode');
+      process.exit(1);
+    }
+
+    // Bump package.json version using npm version (no git tag, we handle tagging ourselves)
+    const cwd = existsSync('package.json') ? '.' : 'js';
+    exec(`npm version ${bumpType} --no-git-tag-version`, { cwd, stdio: 'inherit' });
+
+    const newVersion = getPackageJsonVersion();
+
+    // Check if this version was already released
+    if (checkTagExists(newVersion)) {
+      console.log(`Tag ${tagPrefix}${newVersion} already exists`);
+      setOutput('already_released', 'true');
+      setOutput('new_version', newVersion);
+      setOutput('version_committed', 'false');
+      return;
+    }
+
+    // Stage changes
+    exec('git add -A');
+
+    // Check if there are changes to commit
+    try {
+      exec('git diff --cached --quiet', { stdio: 'ignore' });
+      console.log('No changes to commit');
+      setOutput('version_committed', 'false');
+      setOutput('new_version', newVersion);
+      return;
+    } catch {
+      // There are changes to commit
+    }
+
+    // Commit changes
+    const labelStr = releaseLabel ? `(${releaseLabel}) ` : '';
+    const commitMsg = description
+      ? `chore: release ${labelStr}${tagPrefix}${newVersion}\n\n${description}`
+      : `chore: release ${labelStr}${tagPrefix}${newVersion}`;
+    exec(`git commit -m "${commitMsg.replace(/"/g, '\\"')}"`);
+    console.log(`Committed version ${newVersion}`);
+
+    // Create tag
+    const tagName = `${tagPrefix}${newVersion}`;
+    const displayName = releaseLabel ? `[${releaseLabel}] ${newVersion}` : `${tagPrefix}${newVersion}`;
+    const tagMsg = description
+      ? `Release ${displayName}\n\n${description}`
+      : `Release ${displayName}`;
+    exec(`git tag -a ${tagName} -m "${tagMsg.replace(/"/g, '\\"')}"`);
+    console.log(`Created tag ${tagName}`);
+
+    // Push changes and tag
+    exec('git push');
+    exec('git push --tags');
+    console.log('Pushed changes and tags');
+
+    setOutput('version_committed', 'true');
+    setOutput('new_version', newVersion);
+  } catch (error) {
+    console.error('Error:', error.message);
+    process.exit(1);
+  }
+}
+
+if (mode === 'changeset') {
+  mainChangeset();
+} else if (mode === 'instant') {
+  mainInstantJs();
+} else {
+  mainRust();
+}

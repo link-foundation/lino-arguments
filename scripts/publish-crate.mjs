@@ -64,13 +64,13 @@ function setOutput(key, value) {
 }
 
 /**
- * Execute a shell command
+ * Execute a shell command, capturing output
  * @param {string} command - The command to execute
  * @param {Object} options - Execution options
  * @returns {string} - The command output
  */
 function exec(command, options = {}) {
-  return execSync(command, { encoding: 'utf-8', stdio: 'inherit', ...options });
+  return execSync(command, { encoding: 'utf-8', stdio: 'pipe', ...options });
 }
 
 /**
@@ -107,6 +107,25 @@ function main() {
       );
     }
 
+    // First, check if this version is already published on crates.io
+    try {
+      const cratesIoResponse = execSync(
+        `curl -s https://crates.io/api/v1/crates/${name}/${version}`,
+        { encoding: 'utf-8' }
+      );
+      const cratesIoData = JSON.parse(cratesIoResponse);
+      if (cratesIoData.version && cratesIoData.version.num === version) {
+        console.log(
+          `Version ${version} already exists on crates.io - skipping publish`
+        );
+        setOutput('publish_result', 'already_exists');
+        return;
+      }
+    } catch {
+      // Version not found on crates.io or API error - proceed with publish
+      console.log('Version not found on crates.io, proceeding with publish...');
+    }
+
     try {
       // Build the cargo publish command
       let command = 'cargo publish --allow-dirty';
@@ -119,24 +138,26 @@ function main() {
         command = `cd ${rustRoot} && ${command}`;
       }
 
-      exec(command);
+      const output = exec(command);
+      console.log(output);
 
       console.log(`Successfully published ${name}@${version} to crates.io`);
       setOutput('publish_result', 'success');
     } catch (error) {
-      const errorMessage = error.message || '';
+      // With stdio: 'pipe', the error output is captured in stderr/stdout
+      const errorOutput = (error.stderr || '') + (error.stdout || '') + (error.message || '');
 
       if (
-        errorMessage.includes('already uploaded') ||
-        errorMessage.includes('already exists')
+        errorOutput.includes('already uploaded') ||
+        errorOutput.includes('already exists')
       ) {
         console.log(
           `Version ${version} already exists on crates.io - this is OK`
         );
         setOutput('publish_result', 'already_exists');
       } else {
-        console.error('Failed to publish for unknown reason');
-        console.error(errorMessage);
+        console.error('Failed to publish to crates.io');
+        console.error(errorOutput);
         setOutput('publish_result', 'failed');
         process.exit(1);
       }

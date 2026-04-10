@@ -1,0 +1,49 @@
+{
+  "issue": {
+    "number": 27,
+    "title": "Fix CI/CD so we never publish the same version twice",
+    "url": "https://github.com/link-foundation/lino-arguments/issues/27",
+    "labels": ["bug"]
+  },
+  "failed_ci_run": {
+    "id": 24248668790,
+    "url": "https://github.com/link-foundation/lino-arguments/actions/runs/24248668790/job/70801987692",
+    "workflow": "Rust CI/CD",
+    "trigger": "push to main",
+    "commit": "6308d6e841743920b170dd5fd714ffc9915be4d1",
+    "failed_job": "Auto Release",
+    "error": "crate lino-arguments@0.2.0 already exists on crates.io index",
+    "exit_code": 1
+  },
+  "root_causes": [
+    {
+      "id": "RC1",
+      "summary": "publish-crate.mjs used stdio:'inherit' preventing error detection",
+      "details": "execSync with stdio:'inherit' sends stderr to terminal not error.message, so 'already exists' check never matched"
+    },
+    {
+      "id": "RC2",
+      "summary": "check-release-needed.mjs only checked git tags not crates.io",
+      "details": "Git tags and registry publication are independent; checking only tags is unreliable"
+    },
+    {
+      "id": "RC3",
+      "summary": "Shared 'v' tag prefix for both JS and Rust releases",
+      "details": "Both languages used v{version} tags, creating collision risk"
+    },
+    {
+      "id": "RC4",
+      "summary": "Hardcoded 'test-anywhere' package name in publish-to-npm.mjs",
+      "details": "Copy-paste from template; npm version check used wrong package name"
+    }
+  ],
+  "versions_at_time_of_issue": {
+    "javascript": "0.3.0",
+    "rust": "0.2.0"
+  },
+  "existing_tags": ["v0.1.1", "v0.2.0", "v0.2.5", "v0.2.7", "v0.2.8", "v0.3.0"],
+  "fix_pr": {
+    "number": 28,
+    "url": "https://github.com/link-foundation/lino-arguments/pull/28"
+  }
+}

@@ -36,6 +36,7 @@ const version = getArg('release-version', process.env.VERSION || '');
 const repository = getArg('repository', process.env.REPOSITORY || '');
 const tagPrefix = getArg('tag-prefix', process.env.TAG_PREFIX || 'v');
 const cratesIoUrl = getArg('crates-io-url', process.env.CRATES_IO_URL || '');
+const releaseLabel = getArg('release-label', process.env.RELEASE_LABEL || '');
 
 // Get Rust package root (auto-detect or use explicit config)
 const rustRootConfig = parseRustRootConfig();
@@ -92,9 +93,12 @@ try {
 
   // Create release using GitHub API with JSON input
   // This avoids shell escaping issues
+  const releaseName = releaseLabel
+    ? `[${releaseLabel}] ${version}`
+    : `${tagPrefix}${version}`;
   const payload = JSON.stringify({
     tag_name: tag,
-    name: `${tagPrefix}${version}`,
+    name: releaseName,
     body: releaseNotes,
   });
 
