@@ -112,7 +112,7 @@ try {
   }
 
   // Build formatted release notes
-  const versionWithoutV = version.replace(/^v/, '');
+  const versionWithoutV = version.replace(/^(v|js_|rust_)/, '');
   const npmBadge = `[![npm version](https://img.shields.io/badge/npm-${versionWithoutV}-blue.svg)](https://www.npmjs.com/package/${packageName}/v/${versionWithoutV})`;
 
   let formattedBody = `## What's Changed\n\n${cleanDescription}`;
