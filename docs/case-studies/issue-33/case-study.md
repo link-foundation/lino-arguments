@@ -80,20 +80,24 @@ The `@changesets/cli` `publish` command can exit with code 0 even when individua
 
 Added a "Configure git identity" step using `git-config.mjs` in both the `release` and `instant-release` jobs of `js.yml`, before any steps that might create git tags or commits.
 
-### Fix 2: Decouple tag/release creation from publish step
+### Fix 2: Make publish step always verify and report publish status
 
-Added a new "Determine release version" step that:
-1. Resolves the release version from publish outputs or package.json
-2. Checks if the `js_` prefixed tag exists
-3. Checks if a GitHub Release exists for that tag
-4. Sets `needs_tag` and `needs_release` outputs independently
+The `steps.publish.outputs.published == 'true'` condition for tag/release creation is correct — we should not release if not published. The fix is in the publish script itself:
 
-Tag creation and GitHub Release creation now use these independent checks instead of being gated on `published == 'true'`. This ensures:
-- Re-runs create missing tags and releases even if the version is already on npm
-- Partial failures are recovered automatically
-- Idempotent behavior: existing tags/releases are detected and skipped
+Updated `publish-to-npm.mjs` to:
+1. **Always verify** the version is published on npm, whether freshly published or already existing
+2. **Compare content** when version already exists: download the published tarball and compare its SHA-256 checksum with a locally-packed tarball
+3. **Set `published=true`** when the version is verified on npm with matching content (including when it was already published)
+4. **Bump version and republish** when content on npm differs from local (content mismatch recovery)
+5. **Fail explicitly** (exit 1) if publish cannot be verified after retries — never silently skip
 
-### Fix 3: Improved publish script logging
+This ensures:
+- Re-runs set `published=true` when the version is already correctly published on npm
+- Content mismatches trigger automatic version bump and republish
+- Tag/release creation always proceeds when publish is verified
+- No silent failures — the pipeline fails if it cannot verify publication
+
+### Fix 3: Improved publish script error handling
 
 Updated `publish-to-npm.mjs` to:
 - Always run post-publish verification regardless of whether changeset publish succeeded or failed
@@ -102,8 +106,8 @@ Updated `publish-to-npm.mjs` to:
 
 ## Files Changed
 
-- `.github/workflows/js.yml` - Added git config, decoupled release creation
-- `scripts/publish-to-npm.mjs` - Improved error handling and logging
+- `.github/workflows/js.yml` - Added git config step
+- `scripts/publish-to-npm.mjs` - Added content verification, version bump recovery, and explicit failure
 
 ## Related Issues and Context
 
