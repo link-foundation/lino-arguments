@@ -283,6 +283,10 @@ jobs:
       - name: Update npm for OIDC trusted publishing
         run: node ../scripts/setup-npm.mjs
 
+      - name: Configure git identity
+        working-directory: .
+        run: node scripts/git-config.mjs
+
       - name: Check for changesets
         id: check_changesets
         run: |
@@ -380,6 +384,10 @@ jobs:
 
       - name: Update npm for OIDC trusted publishing
         run: node ../scripts/setup-npm.mjs
+
+      - name: Configure git identity
+        working-directory: .
+        run: node scripts/git-config.mjs
 
       - name: Version packages and commit to main
         id: version
