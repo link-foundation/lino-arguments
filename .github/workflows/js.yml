@@ -283,6 +283,10 @@ jobs:
       - name: Update npm for OIDC trusted publishing
         run: node ../scripts/setup-npm.mjs
 
+      - name: Configure git identity
+        working-directory: .
+        run: node scripts/git-config.mjs
+
       - name: Check for changesets
         id: check_changesets
         run: |
@@ -318,42 +322,69 @@ jobs:
         id: publish
         run: node ../scripts/publish-to-npm.mjs --should-pull
 
+      - name: Determine release version
+        id: release_version
+        run: |
+          # Use published version if available, otherwise use current version
+          if [ -n "${{ steps.publish.outputs.published_version }}" ]; then
+            VERSION="${{ steps.publish.outputs.published_version }}"
+          else
+            VERSION="${{ steps.check_publish.outputs.current_version }}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+          # Determine if we need to create tag and release
+          TAG="js_${VERSION}"
+          NEEDS_TAG="false"
+          NEEDS_RELEASE="false"
+
+          # Check if tag exists
+          if ! git rev-parse "${TAG}" >/dev/null 2>&1; then
+            NEEDS_TAG="true"
+          fi
+
+          # Check if GitHub release exists
+          if ! gh release view "${TAG}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            NEEDS_RELEASE="true"
+          fi
+
+          echo "needs_tag=${NEEDS_TAG}" >> $GITHUB_OUTPUT
+          echo "needs_release=${NEEDS_RELEASE}" >> $GITHUB_OUTPUT
+          echo "Release version: ${VERSION}, needs_tag: ${NEEDS_TAG}, needs_release: ${NEEDS_RELEASE}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Ensure release tag exists
-        if: steps.publish.outputs.published == 'true'
+        if: steps.release_version.outputs.needs_tag == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${{ steps.publish.outputs.published_version }}"
+          VERSION="${{ steps.release_version.outputs.version }}"
           TAG="js_${VERSION}"
-          # Check if the js_ prefixed tag already exists
-          if git rev-parse "${TAG}" >/dev/null 2>&1; then
-            echo "Tag ${TAG} already exists"
+          echo "Tag ${TAG} does not exist, creating it..."
+          # Try to use the v-prefixed tag commit if it exists (migration from old tag scheme)
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            COMMIT=$(git rev-parse "v${VERSION}")
+            echo "Using commit from v${VERSION} tag: ${COMMIT}"
           else
-            echo "Tag ${TAG} does not exist, creating it..."
-            # Try to use the v-prefixed tag commit if it exists (migration from old tag scheme)
-            if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
-              COMMIT=$(git rev-parse "v${VERSION}")
-              echo "Using commit from v${VERSION} tag: ${COMMIT}"
-            else
-              COMMIT=$(git rev-parse HEAD)
-              echo "Using HEAD commit: ${COMMIT}"
-            fi
-            git tag -a "${TAG}" "${COMMIT}" -m "Release [JavaScript] ${VERSION}"
-            git push origin "${TAG}"
-            echo "Created and pushed tag ${TAG}"
+            COMMIT=$(git rev-parse HEAD)
+            echo "Using HEAD commit: ${COMMIT}"
           fi
+          git tag -a "${TAG}" "${COMMIT}" -m "Release [JavaScript] ${VERSION}"
+          git push origin "${TAG}"
+          echo "Created and pushed tag ${TAG}"
 
       - name: Create GitHub Release
-        if: steps.publish.outputs.published == 'true'
+        if: steps.release_version.outputs.needs_release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node ../scripts/create-github-release.mjs --release-version "${{ steps.publish.outputs.published_version }}" --repository "${{ github.repository }}" --tag-prefix "js_" --release-label "JavaScript"
+        run: node ../scripts/create-github-release.mjs --release-version "${{ steps.release_version.outputs.version }}" --repository "${{ github.repository }}" --tag-prefix "js_" --release-label "JavaScript"
 
       - name: Format GitHub release notes
-        if: steps.publish.outputs.published == 'true'
+        if: steps.release_version.outputs.needs_release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node ../scripts/format-github-release.mjs --release-version "${{ steps.publish.outputs.published_version }}" --repository "${{ github.repository }}" --commit-sha "${{ github.sha }}" --tag-prefix "js_"
+        run: node ../scripts/format-github-release.mjs --release-version "${{ steps.release_version.outputs.version }}" --repository "${{ github.repository }}" --commit-sha "${{ github.sha }}" --tag-prefix "js_"
 
   # Manual Instant Release
   instant-release:
@@ -381,6 +412,10 @@ jobs:
       - name: Update npm for OIDC trusted publishing
         run: node ../scripts/setup-npm.mjs
 
+      - name: Configure git identity
+        working-directory: .
+        run: node scripts/git-config.mjs
+
       - name: Version packages and commit to main
         id: version
         run: node ../scripts/version-and-commit.mjs --mode instant --bump-type "${{ github.event.inputs.bump_type }}" --description "${{ github.event.inputs.description }}" --tag-prefix "js_" --release-label "JavaScript"
@@ -390,17 +425,41 @@ jobs:
         id: publish
         run: node ../scripts/publish-to-npm.mjs
 
-      - name: Create GitHub Release
-        if: steps.publish.outputs.published == 'true'
+      - name: Determine release version
+        id: release_version
+        run: |
+          # Use published version if available, otherwise use version output
+          if [ -n "${{ steps.publish.outputs.published_version }}" ]; then
+            VERSION="${{ steps.publish.outputs.published_version }}"
+          elif [ -n "${{ steps.version.outputs.new_version }}" ]; then
+            VERSION="${{ steps.version.outputs.new_version }}"
+          else
+            VERSION=$(node -p "require('./package.json').version")
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+          # Check if GitHub release exists
+          TAG="js_${VERSION}"
+          NEEDS_RELEASE="false"
+          if ! gh release view "${TAG}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            NEEDS_RELEASE="true"
+          fi
+          echo "needs_release=${NEEDS_RELEASE}" >> $GITHUB_OUTPUT
+          echo "Release version: ${VERSION}, needs_release: ${NEEDS_RELEASE}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node ../scripts/create-github-release.mjs --release-version "${{ steps.publish.outputs.published_version }}" --repository "${{ github.repository }}" --tag-prefix "js_" --release-label "JavaScript"
+
+      - name: Create GitHub Release
+        if: steps.release_version.outputs.needs_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node ../scripts/create-github-release.mjs --release-version "${{ steps.release_version.outputs.version }}" --repository "${{ github.repository }}" --tag-prefix "js_" --release-label "JavaScript"
 
       - name: Format GitHub release notes
-        if: steps.publish.outputs.published == 'true'
+        if: steps.release_version.outputs.needs_release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node ../scripts/format-github-release.mjs --release-version "${{ steps.publish.outputs.published_version }}" --repository "${{ github.repository }}" --commit-sha "${{ github.sha }}" --tag-prefix "js_"
+        run: node ../scripts/format-github-release.mjs --release-version "${{ steps.release_version.outputs.version }}" --repository "${{ github.repository }}" --commit-sha "${{ github.sha }}" --tag-prefix "js_"
 
   # Manual Changeset PR
   changeset-pr:

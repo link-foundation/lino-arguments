@@ -98,38 +98,35 @@ async function main() {
       console.log(`Publish attempt ${i} of ${MAX_RETRIES}...`);
       try {
         await $`npm run changeset:publish`;
+        console.log(`Publish command completed (attempt ${i})`);
+      } catch (publishError) {
+        console.error(`Publish command failed (attempt ${i}):`, publishError.message || publishError);
+      }
 
-        // Verify the publish actually succeeded by checking npm registry
-        // changeset publish can exit with code 0 even when individual packages fail
-        console.log('Verifying publish on npm registry...');
-        await sleep(3000); // Wait for registry propagation
-        const verifyResult =
-          await $`npm view "${PACKAGE_NAME}@${currentVersion}" version`.run({
-            capture: true,
-          });
+      // Verify the publish actually succeeded by checking npm registry
+      // changeset publish can exit with code 0 even when individual packages fail,
+      // or fail with an error even when the publish actually succeeded
+      console.log('Verifying publish on npm registry...');
+      await sleep(3000); // Wait for registry propagation
+      const verifyResult =
+        await $`npm view "${PACKAGE_NAME}@${currentVersion}" version`.run({
+          capture: true,
+        });
 
-        if (verifyResult.code === 0) {
-          setOutput('published', 'true');
-          setOutput('published_version', currentVersion);
-          console.log(
-            `\u2705 Verified ${PACKAGE_NAME}@${currentVersion} is published on npm`
-          );
-          return;
-        } else {
-          console.error(
-            `\u274C changeset publish exited successfully but ${PACKAGE_NAME}@${currentVersion} was not found on npm`
-          );
-          if (i < MAX_RETRIES) {
-            console.log(
-              `Retrying in ${RETRY_DELAY / 1000}s...`
-            );
-            await sleep(RETRY_DELAY);
-          }
-        }
-      } catch {
+      if (verifyResult.code === 0) {
+        setOutput('published', 'true');
+        setOutput('published_version', currentVersion);
+        console.log(
+          `\u2705 Verified ${PACKAGE_NAME}@${currentVersion} is published on npm`
+        );
+        return;
+      } else {
+        console.error(
+          `\u274C ${PACKAGE_NAME}@${currentVersion} was not found on npm after attempt ${i}`
+        );
         if (i < MAX_RETRIES) {
           console.log(
-            `Publish failed, waiting ${RETRY_DELAY / 1000}s before retry...`
+            `Retrying in ${RETRY_DELAY / 1000}s...`
           );
           await sleep(RETRY_DELAY);
         }
