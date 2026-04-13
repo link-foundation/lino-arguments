@@ -1,0 +1,15 @@
+{
+  "issue_number": 35,
+  "title": "Bug: version-and-commit.mjs checks git tags instead of registry, causing release pipeline to get stuck",
+  "repository": "link-foundation/lino-arguments",
+  "created_at": "2026-04-13T02:36:04Z",
+  "root_cause": "checkTagExists() used git rev-parse to check for tags instead of querying the package registry (npm/crates.io), causing the pipeline to exit early when a tag existed without the package being published",
+  "affected_modes": ["rust", "changeset", "instant"],
+  "affected_files": ["scripts/version-and-commit.mjs"],
+  "fix_approach": "Replace tag-only checks with registry-based checks (npm view / crates.io API) plus auto-recovery logic that bumps patch version until finding an unpublished version",
+  "related_issues": [
+    "link-foundation/browser-commander#47",
+    "link-foundation/rust-ai-driven-development-pipeline-template#25"
+  ],
+  "reference_implementation": "link-foundation/rust-ai-driven-development-pipeline-template/scripts/version-and-commit.rs"
+}
