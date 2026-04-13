@@ -1,8 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * Bump version in Cargo.toml and commit changes
+ * Bump version in Cargo.toml or package.json and commit changes
  * Used by the CI/CD pipeline for releases
+ *
+ * IMPORTANT: This script checks the package registry (npm/crates.io) as the
+ * source of truth for published versions, NOT git tags. This is critical because:
+ * - Git tags can exist without the package being published
+ * - GitHub releases create tags but don't publish to registries
+ * - Only registry publication means users can actually install the package
  *
  * Supports both single-language and multi-language repository structures:
  * - Single-language: Cargo.toml and changelog.d/ in repository root
@@ -156,6 +162,160 @@ function checkTagExists(version) {
 }
 
 /**
+ * Get crate name from Cargo.toml
+ * @returns {string}
+ */
+function getCrateName() {
+  const cargoToml = readFileSync(CARGO_TOML, 'utf-8');
+  const match = cargoToml.match(/^name\s*=\s*"([^"]+)"/m);
+  if (!match) {
+    console.error(`Error: Could not parse crate name from ${CARGO_TOML}`);
+    process.exit(1);
+  }
+  return match[1];
+}
+
+/**
+ * Check if a version exists on crates.io
+ * @param {string} crateName
+ * @param {string} version
+ * @returns {boolean}
+ */
+function checkVersionOnCratesIo(crateName, version) {
+  try {
+    const response = exec(
+      `curl -s -o /dev/null -w "%{http_code}" -H "User-Agent: version-and-commit-mjs" https://crates.io/api/v1/crates/${crateName}/${version}`
+    ).trim();
+    return response === '200';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get the maximum published version from crates.io
+ * @param {string} crateName
+ * @returns {{major: number, minor: number, patch: number}|null}
+ */
+function getMaxPublishedCratesIoVersion(crateName) {
+  try {
+    const response = exec(
+      `curl -s -H "User-Agent: version-and-commit-mjs" https://crates.io/api/v1/crates/${crateName}`
+    );
+    const data = JSON.parse(response);
+    if (!data.versions || !Array.isArray(data.versions)) return null;
+
+    let max = null;
+    for (const v of data.versions) {
+      if (v.yanked) continue;
+      const base = v.num.split('-')[0];
+      const parts = base.split('.');
+      if (parts.length !== 3) continue;
+      const [major, minor, patch] = parts.map(Number);
+      if (isNaN(major) || isNaN(minor) || isNaN(patch)) continue;
+      if (!max || major > max.major || (major === max.major && minor > max.minor) || (major === max.major && minor === max.minor && patch > max.patch)) {
+        max = { major, minor, patch };
+      }
+    }
+    return max;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if a version exists on npm registry
+ * @param {string} packageName
+ * @param {string} version
+ * @returns {boolean}
+ */
+function checkVersionOnNpm(packageName, version) {
+  try {
+    exec(`npm view "${packageName}@${version}" version`, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get the maximum published version from npm
+ * @param {string} packageName
+ * @returns {{major: number, minor: number, patch: number}|null}
+ */
+function getMaxPublishedNpmVersion(packageName) {
+  try {
+    const response = exec(`npm view "${packageName}" versions --json`).trim();
+    const versions = JSON.parse(response);
+    if (!Array.isArray(versions) || versions.length === 0) return null;
+
+    let max = null;
+    for (const v of versions) {
+      const base = v.split('-')[0];
+      const parts = base.split('.');
+      if (parts.length !== 3) continue;
+      const [major, minor, patch] = parts.map(Number);
+      if (isNaN(major) || isNaN(minor) || isNaN(patch)) continue;
+      if (!max || major > max.major || (major === max.major && minor > max.minor) || (major === max.major && minor === max.minor && patch > max.patch)) {
+        max = { major, minor, patch };
+      }
+    }
+    return max;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Ensure the version exceeds the maximum published version on a registry.
+ * If the proposed version is <= the max published version, bumps the patch
+ * to be one above. Also skips versions where a git tag or registry entry already exists.
+ * @param {string} versionStr - The proposed version
+ * @param {string} registryType - 'crates.io' or 'npm'
+ * @param {string} packageName - The crate or npm package name
+ * @param {{major: number, minor: number, patch: number}|null} maxPublished
+ * @returns {string} The final version to use
+ */
+function ensureVersionExceedsPublished(versionStr, registryType, packageName, maxPublished) {
+  const parts = versionStr.split('-')[0].split('.');
+  if (parts.length !== 3) return versionStr;
+
+  let [major, minor, patch] = parts.map(Number);
+
+  if (maxPublished) {
+    const { major: pubMajor, minor: pubMinor, patch: pubPatch } = maxPublished;
+    if (major < pubMajor || (major === pubMajor && minor < pubMinor) || (major === pubMajor && minor === pubMinor && patch <= pubPatch)) {
+      console.log(
+        `Version ${major}.${minor}.${patch} is not greater than max published ${pubMajor}.${pubMinor}.${pubPatch}, adjusting to ${pubMajor}.${pubMinor}.${pubPatch + 1}`
+      );
+      major = pubMajor;
+      minor = pubMinor;
+      patch = pubPatch + 1;
+    }
+  }
+
+  let candidate = `${major}.${minor}.${patch}`;
+  const checkRegistry = registryType === 'crates.io'
+    ? (v) => checkVersionOnCratesIo(packageName, v)
+    : (v) => checkVersionOnNpm(packageName, v);
+
+  let safetyCounter = 0;
+  while ((checkTagExists(candidate) || checkRegistry(candidate)) && safetyCounter < 100) {
+    console.log(`Version ${candidate} already has a git tag or is published on ${registryType}, bumping patch`);
+    patch += 1;
+    candidate = `${major}.${minor}.${patch}`;
+    safetyCounter += 1;
+  }
+
+  if (safetyCounter >= 100) {
+    console.error('Error: Could not find an unpublished version after 100 attempts');
+    process.exit(1);
+  }
+
+  return candidate;
+}
+
+/**
  * Strip frontmatter from markdown content
  * @param {string} content - Markdown content potentially with frontmatter
  * @returns {string} - Content without frontmatter
@@ -250,17 +410,33 @@ function mainChangeset() {
     const cwd = existsSync('package.json') ? '.' : 'js';
     exec(`npm run changeset:version`, { cwd, stdio: 'inherit' });
 
-    // Get the new version after changeset version
-    const newVersion = getPackageJsonVersion();
+    // Get the new version after changeset version and the package name
+    const pkgPath = existsSync('package.json') ? 'package.json' : 'js/package.json';
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+    const packageName = pkg.name;
+    let newVersion = pkg.version;
 
-    // Check if this version was already released
-    if (checkTagExists(newVersion)) {
-      console.log(`Tag ${tagPrefix}${newVersion} already exists`);
-      setOutput('already_released', 'true');
-      setOutput('new_version', newVersion);
-      setOutput('version_committed', 'false');
-      return;
+    const maxPublished = getMaxPublishedNpmVersion(packageName);
+    if (maxPublished) {
+      console.log(`Max published version on npm: ${maxPublished.major}.${maxPublished.minor}.${maxPublished.patch}`);
+    } else {
+      console.log('No versions published on npm yet (or package not found)');
     }
+
+    console.log(`Changeset version: ${newVersion}`);
+
+    const adjustedVersion = ensureVersionExceedsPublished(newVersion, 'npm', packageName, maxPublished);
+
+    if (adjustedVersion !== newVersion) {
+      console.log(`Adjusted version from ${newVersion} to ${adjustedVersion} to exceed published versions`);
+      newVersion = adjustedVersion;
+      // Update package.json with the adjusted version
+      pkg.version = newVersion;
+      writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
+      console.log(`Updated ${pkgPath} to version ${newVersion}`);
+    }
+
+    console.log(`Final release version: ${newVersion}`);
 
     // Stage all changes made by changeset version
     exec('git add -A');
@@ -312,15 +488,25 @@ function mainRust() {
     exec('git config user.email "github-actions[bot]@users.noreply.github.com"');
 
     const current = getCurrentVersion();
-    const newVersion = calculateNewVersion(current, bumpType);
+    const initialBump = calculateNewVersion(current, bumpType);
+    const crateName = getCrateName();
 
-    // Check if this version was already released
-    if (checkTagExists(newVersion)) {
-      console.log(`Tag ${tagPrefix}${newVersion} already exists`);
-      setOutput('already_released', 'true');
-      setOutput('new_version', newVersion);
-      return;
+    const maxPublished = getMaxPublishedCratesIoVersion(crateName);
+    if (maxPublished) {
+      console.log(`Max published version on crates.io: ${maxPublished.major}.${maxPublished.minor}.${maxPublished.patch}`);
+    } else {
+      console.log('No versions published on crates.io yet (or crate not found)');
     }
+
+    console.log(`Initial bump (${bumpType}) from ${current.major}.${current.minor}.${current.patch}: ${initialBump}`);
+
+    const newVersion = ensureVersionExceedsPublished(initialBump, 'crates.io', crateName, maxPublished);
+
+    if (newVersion !== initialBump) {
+      console.log(`Adjusted version from ${initialBump} to ${newVersion} to exceed published versions`);
+    }
+
+    console.log(`Final release version: ${newVersion}`);
 
     // Update version in Cargo.toml
     updateCargoToml(newVersion);
@@ -395,16 +581,31 @@ function mainInstantJs() {
     const cwd = existsSync('package.json') ? '.' : 'js';
     exec(`npm version ${bumpType} --no-git-tag-version`, { cwd, stdio: 'inherit' });
 
-    const newVersion = getPackageJsonVersion();
+    const pkgPath = existsSync('package.json') ? 'package.json' : 'js/package.json';
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+    const packageName = pkg.name;
+    let newVersion = pkg.version;
 
-    // Check if this version was already released
-    if (checkTagExists(newVersion)) {
-      console.log(`Tag ${tagPrefix}${newVersion} already exists`);
-      setOutput('already_released', 'true');
-      setOutput('new_version', newVersion);
-      setOutput('version_committed', 'false');
-      return;
+    const maxPublished = getMaxPublishedNpmVersion(packageName);
+    if (maxPublished) {
+      console.log(`Max published version on npm: ${maxPublished.major}.${maxPublished.minor}.${maxPublished.patch}`);
+    } else {
+      console.log('No versions published on npm yet (or package not found)');
     }
+
+    console.log(`Initial bump (${bumpType}): ${newVersion}`);
+
+    const adjustedVersion = ensureVersionExceedsPublished(newVersion, 'npm', packageName, maxPublished);
+
+    if (adjustedVersion !== newVersion) {
+      console.log(`Adjusted version from ${newVersion} to ${adjustedVersion} to exceed published versions`);
+      newVersion = adjustedVersion;
+      pkg.version = newVersion;
+      writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
+      console.log(`Updated ${pkgPath} to version ${newVersion}`);
+    }
+
+    console.log(`Final release version: ${newVersion}`);
 
     // Stage changes
     exec('git add -A');
