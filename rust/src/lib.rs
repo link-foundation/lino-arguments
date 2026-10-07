@@ -122,7 +122,9 @@ pub enum ConfigError {
 /// This is what makes the drop-in replacement work: just change the import
 /// from `use clap::Parser` to `use lino_arguments::Parser` and everything
 /// else stays the same.
-#[ctor::ctor]
+// SAFETY: Initialization runs once before main, before application threads
+// can read or modify the environment loaded here.
+#[ctor::ctor(unsafe)]
 fn auto_init() {
     init();
 }

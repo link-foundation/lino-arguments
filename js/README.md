@@ -17,6 +17,10 @@ A unified configuration library combining Links Notation Environment (lino-env),
 
 ## Installation
 
+Requires Node.js ^20.19.0, ^22.12.0, or >=23. Bun and Deno are also supported.
+The Deno configuration permits newly published dependencies to follow this
+repository's latest-release requirement.
+
 ```bash
 npm install lino-arguments
 ```
@@ -372,6 +376,8 @@ deno test --allow-read --allow-write --allow-env
 
 ## Development
 
+Use Node.js 24 and npm >=10.9.0 for the current lint and release tools.
+
 ```bash
 # Install dependencies
 npm install
@@ -390,6 +396,9 @@ npm run format
 
 # Check file size limits
 npm run check:file-size
+
+# Fail when any runtime, optional peer, or development dependency is outdated
+npm run check:dependencies
 ```
 
 ## Contributing

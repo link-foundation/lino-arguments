@@ -950,9 +950,17 @@ describe('parseLinoArguments (legacy)', () => {
   it('should parse simple links notation format', () => {
     const input = '(\n  --verbose\n  --port 3000\n)';
     const result = parseLinoArguments(input);
-    expect(result.includes('--verbose')).toBeTruthy();
-    expect(result.includes('--port')).toBeTruthy();
-    expect(result.includes('3000')).toBeTruthy();
+    expect(result).toEqual(['--verbose', '--port', '3000']);
+  });
+
+  it('should preserve argument order through nested links', () => {
+    const input = '(\n  (--host localhost)\n  (--port 3000)\n)';
+    expect(parseLinoArguments(input)).toEqual([
+      '--host',
+      'localhost',
+      '--port',
+      '3000',
+    ]);
   });
 
   it('should parse arguments without parentheses', () => {
