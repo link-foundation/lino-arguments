@@ -7,11 +7,17 @@ on:
     paths:
       - 'rust/**'
       - '.github/workflows/rust.yml'
+      - 'scripts/check-rust-dependencies.mjs'
+      - 'experiments/test-dependency-blockers.mjs'
+      - 'experiments/test-latest-rust-consumer.mjs'
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - 'rust/**'
       - '.github/workflows/rust.yml'
+      - 'scripts/check-rust-dependencies.mjs'
+      - 'experiments/test-dependency-blockers.mjs'
+      - 'experiments/test-latest-rust-consumer.mjs'
   workflow_dispatch:
     inputs:
       release_mode:
@@ -50,6 +56,36 @@ defaults:
     working-directory: rust
 
 jobs:
+  dependencies:
+    name: Dependency Freshness
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24.x'
+
+      - name: Test blocker policy
+        working-directory: .
+        run: node --test experiments/test-dependency-blockers.mjs
+
+      - name: Install cargo-outdated
+        run: cargo install cargo-outdated --locked
+
+      - name: Check direct and development dependencies
+        working-directory: .
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/check-rust-dependencies.mjs
+
   # === DETECT CHANGES - determines which jobs should run ===
   detect-changes:
     name: Detect Changes
@@ -66,14 +102,14 @@ jobs:
       rust-code-changed: ${{ steps.changes.outputs.rust-code-changed }}
       rust-package-changed: ${{ steps.changes.outputs.rust-package-changed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.0.0
         with:
-          node-version: '20.x'
+          node-version: '24.x'
 
       - name: Detect changes
         id: changes
@@ -93,14 +129,14 @@ jobs:
     needs: [detect-changes]
     if: github.event_name == 'pull_request' && needs.detect-changes.outputs.rust-package-changed == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.0.0
         with:
-          node-version: '20.x'
+          node-version: '24.x'
 
       - name: Check for changelog fragments
         working-directory: .
@@ -116,14 +152,14 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.0.0
         with:
-          node-version: '20.x'
+          node-version: '24.x'
 
       - name: Check for manual version changes
         working-directory: .
@@ -151,7 +187,7 @@ jobs:
         needs.detect-changes.outputs.rust-workflow-changed == 'true'
       )
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -159,12 +195,12 @@ jobs:
           components: rustfmt, clippy
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.0.0
         with:
-          node-version: '20.x'
+          node-version: '24.x'
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -197,13 +233,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -219,21 +255,30 @@ jobs:
       - name: Run doc tests
         run: cargo test --doc --verbose
 
+      - name: Setup Node.js for consumer regression test
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24.x'
+
+      - name: Verify latest-version consumer
+        working-directory: .
+        run: node experiments/test-latest-rust-consumer.mjs
+
   # === BUILD ===
   # Build package - only runs if lint and test pass
   build:
     name: Build Package
     runs-on: ubuntu-latest
-    needs: [lint, test]
-    if: always() && !cancelled() && needs.lint.result == 'success' && needs.test.result == 'success'
+    needs: [lint, test, dependencies]
+    if: always() && !cancelled() && needs.lint.result == 'success' && needs.test.result == 'success' && needs.dependencies.result == 'success'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -254,7 +299,7 @@ jobs:
   # This job automatically bumps version based on fragments in changelog.d/
   auto-release:
     name: Auto Release
-    needs: [lint, test, build]
+    needs: [lint, test, build, dependencies]
     # Note: always() ensures consistent behavior with other jobs that depend on jobs using always().
     if: |
       always() && !cancelled() &&
@@ -265,7 +310,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -274,9 +319,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.0.0
         with:
-          node-version: '20.x'
+          node-version: '24.x'
 
       - name: Configure git
         working-directory: .
@@ -349,7 +394,7 @@ jobs:
   # Manual release via workflow_dispatch - only after CI passes
   manual-release:
     name: Instant Release
-    needs: [lint, test, build]
+    needs: [lint, test, build, dependencies]
     # Note: always() is required to evaluate the condition when dependencies use always().
     # The build job ensures lint and test passed before this job runs.
     if: |
@@ -361,7 +406,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -370,9 +415,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.0.0
         with:
-          node-version: '20.x'
+          node-version: '24.x'
 
       - name: Configure git
         working-directory: .
@@ -429,14 +474,14 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.0.0
         with:
-          node-version: '20.x'
+          node-version: '24.x'
 
       - name: Create changelog fragment
         working-directory: .
@@ -447,7 +492,7 @@ jobs:
         run: node scripts/create-changelog-fragment.mjs --bump-type "${{ github.event.inputs.bump_type }}" --description "${{ github.event.inputs.description }}"
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8.1.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: 'chore: add changelog for manual ${{ github.event.inputs.bump_type }} release'

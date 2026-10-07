@@ -302,7 +302,22 @@ cargo clippy
 
 # Format code
 cargo fmt
+
+# Check latest direct and development dependency releases
+cargo install cargo-outdated --locked
+node ../scripts/check-rust-dependencies.mjs
 ```
+
+CI requires current dependency releases. If an upgrade is blocked, put an open
+GitHub issue URL explaining the blocker in a comment on that dependency's
+`Cargo.toml` line, for example:
+
+```toml
+ctor = "1.0.13" # Blocked by: https://github.com/owner/repository/issues/123
+```
+
+The check verifies the issue is open before exempting the dependency. Closed
+issues, pull requests, and comments without an issue URL grant no exemption.
 
 ## License
 
