@@ -402,18 +402,25 @@ export function parseLinoArguments(linoString) {
   try {
     const parsed = parser.parse(linoString);
     const args = [];
+    const pending = [...parsed].reverse();
 
-    for (const link of parsed) {
+    // links-notation 0.23 preserves nested line/group nodes. Traverse every
+    // child in source order so the legacy flat argument API stays unchanged.
+    while (pending.length > 0) {
+      const link = pending.pop();
+      if (typeof link === 'string') {
+        args.push(link);
+        continue;
+      }
+
       if (link.id) {
         args.push(link.id);
       }
 
       if (link.values && Array.isArray(link.values)) {
-        for (const value of link.values) {
-          if (value && value.id) {
-            args.push(value.id);
-          } else if (typeof value === 'string') {
-            args.push(value);
+        for (let index = link.values.length - 1; index >= 0; index--) {
+          if (link.values[index]) {
+            pending.push(link.values[index]);
           }
         }
       }

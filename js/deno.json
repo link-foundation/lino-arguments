@@ -1,5 +1,6 @@
 {
   "nodeModulesDir": "auto",
+  "minimumDependencyAge": 0,
   "test": {
     "exclude": ["examples/"]
   }

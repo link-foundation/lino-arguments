@@ -3,7 +3,7 @@
 /**
  * Update npm for OIDC trusted publishing
  * npm trusted publishing requires npm >= 11.5.1
- * Node.js 20.x ships with npm 10.x, so we need to update
+ * Keep npm current on the Node.js 24 CI runners for trusted publishing.
  *
  * Uses link-foundation libraries:
  * - use-m: Dynamic package loading without package.json dependencies
