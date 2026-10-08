@@ -1,0 +1,27 @@
+4817: Release	UNKNOWN STEP	2026-10-07T02:59:08.8097388Z ##[group]Run node ../scripts/version-and-commit.mjs --mode changeset --tag-prefix "js_" --release-label "JavaScript"
+4818: Release	UNKNOWN STEP	2026-10-07T02:59:08.8098219Z ^[[36;1mnode ../scripts/version-and-commit.mjs --mode changeset --tag-prefix "js_" --release-label "JavaScript"^[[0m
+4819: Release	UNKNOWN STEP	2026-10-07T02:59:08.8155708Z shell: /usr/bin/bash -e {0}
+4820: Release	UNKNOWN STEP	2026-10-07T02:59:08.8155970Z env:
+4821: Release	UNKNOWN STEP	2026-10-07T02:59:08.8156223Z   NPM_CONFIG_USERCONFIG: /home/runner/work/_temp/.npmrc
+4822: Release	UNKNOWN STEP	2026-10-07T02:59:08.8156542Z ##[endgroup]
+4823: Release	UNKNOWN STEP	2026-10-07T02:59:08.8533813Z file:///home/runner/work/lino-arguments/lino-arguments/scripts/rust-paths.mjs:82
+4824: Release	UNKNOWN STEP	2026-10-07T02:59:08.8534548Z   throw new Error(
+4825: Release	UNKNOWN STEP	2026-10-07T02:59:08.8534789Z         ^
+4826: Release	UNKNOWN STEP	2026-10-07T02:59:08.8534911Z 
+4827: Release	UNKNOWN STEP	2026-10-07T02:59:08.8535530Z Error: Could not find Cargo.toml in expected locations.
+4828: Release	UNKNOWN STEP	2026-10-07T02:59:08.8535970Z Searched in:
+4829: Release	UNKNOWN STEP	2026-10-07T02:59:08.8536270Z   - ./Cargo.toml (single-language repository)
+4830: Release	UNKNOWN STEP	2026-10-07T02:59:08.8536680Z   - ./rust/Cargo.toml (multi-language repository)
+4831: Release	UNKNOWN STEP	2026-10-07T02:59:08.8536943Z 
+4832: Release	UNKNOWN STEP	2026-10-07T02:59:08.8537069Z To fix this, either:
+4833: Release	UNKNOWN STEP	2026-10-07T02:59:08.8537502Z   1. Run the script from the repository root
+4834: Release	UNKNOWN STEP	2026-10-07T02:59:08.8538092Z   2. Explicitly configure the Rust root using --rust-root option
+4835: Release	UNKNOWN STEP	2026-10-07T02:59:08.8538683Z   3. Set the RUST_ROOT environment variable
+4836: Release	UNKNOWN STEP	2026-10-07T02:59:08.8539560Z     at getRustRoot (file:///home/runner/work/lino-arguments/lino-arguments/scripts/rust-paths.mjs:82:9)
+4837: Release	UNKNOWN STEP	2026-10-07T02:59:08.8540402Z     at file:///home/runner/work/lino-arguments/lino-arguments/scripts/version-and-commit.mjs:56:18
+4838: Release	UNKNOWN STEP	2026-10-07T02:59:08.8541078Z     at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+4839: Release	UNKNOWN STEP	2026-10-07T02:59:08.8541574Z     at async node:internal/modules/esm/loader:647:26
+4840: Release	UNKNOWN STEP	2026-10-07T02:59:08.8542167Z     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+4841: Release	UNKNOWN STEP	2026-10-07T02:59:08.8542600Z 
+4842: Release	UNKNOWN STEP	2026-10-07T02:59:08.8542888Z Node.js v24.21.0
+4843: Release	UNKNOWN STEP	2026-10-07T02:59:08.8577066Z ##[error]Process completed with exit code 1.

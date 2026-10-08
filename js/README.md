@@ -1,425 +1,195 @@
 # lino-arguments
 
-A unified configuration library combining Links Notation Environment (lino-env), yargs, and environment variables with a clear priority chain.
+Configuration from CLI arguments, environment maps, and Links Notation environment files, using yargs and lino-env.
 
 [![npm version](https://img.shields.io/npm/v/lino-arguments.svg)](https://www.npmjs.com/package/lino-arguments)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
 
-## Overview
-
-`lino-arguments` provides a unified configuration system that automatically loads configuration from multiple sources with a clear priority chain:
-
-1. **CLI arguments** - Highest priority (manually entered options)
-2. **getenv defaults** - Environment variable lookups with fallbacks
-3. **--configuration flag** - Dynamic .lenv file path via CLI
-4. **`.lenv` file** - Local environment overrides using Links Notation
-5. **`.env` file** - Base configuration (DEPRECATED, use .lenv instead)
-
 ## Installation
-
-Requires Node.js ^20.19.0, ^22.12.0, or >=23. Bun and Deno are also supported.
-The Deno configuration permits newly published dependencies to follow this
-repository's latest-release requirement.
 
 ```bash
 npm install lino-arguments
 ```
 
-## Quick Start
+Requires Node.js ^20.19.0, ^22.12.0, or >=23. Bun and Deno are supported. The Deno configuration permits newly published dependencies to follow the repository's dependency freshness checks.
 
-### Hero Example
+## Existing process-based usage
 
 ```javascript
 import { makeConfig } from 'lino-arguments';
 
 const config = makeConfig({
   yargs: ({ yargs, getenv }) =>
-    yargs.option('port', { default: getenv('PORT', 3000) }),
+    yargs.option('port', { type: 'number', default: getenv('PORT', 3000) }),
 });
 ```
 
-That's it! This simple configuration:
+Without an injected environment, `makeConfig` retains its process defaults: it reads `process.argv`, loads `.lenv` into `process.env`, and returns CLI options with camelCase keys. `.lenv` overrides the existing process environment by default; set `lenv.override: false` to retain existing values, including empty strings. A file selected by `--configuration`/`-c` overrides both. CLI options always have highest priority.
 
-- ✅ Loads from `.lenv` file automatically
-- ✅ Reads `PORT` environment variable with fallback to 3000
-- ✅ Accepts `--port` CLI argument with highest priority
-- ✅ Supports `--configuration` to specify custom .lenv file path
-- ✅ Returns clean object with camelCase keys
-
-### Complete Example
-
-````javascript
-import { makeConfig } from 'lino-arguments';
-
-const config = makeConfig({
-  yargs: ({ yargs, getenv }) =>
-    yargs
-      .option('port', {
-        type: 'number',
-        default: getenv('PORT', 3000),
-        describe: 'Server port'
-      })
-      .option('api-key', {
-        type: 'string',
-        default: getenv('API_KEY', ''),
-        describe: 'API authentication key'
-      })
-      .option('verbose', {
-        type: 'boolean',
-        default: false,
-        describe: 'Enable verbose logging'
-      })
-});
-
-console.log(config);
-// { port: 3000, apiKey: '...', verbose: false }
-
-## API Reference
-
-### `makeConfig(config)` (Primary API)
-
-The main function for creating unified configuration from multiple sources.
-
-**Parameters:**
-
-- `config` (Object): Configuration object
-  - `yargs` (Function): Required. Yargs configuration function receiving `({ yargs, getenv })`
-  - `lenv` (Object): Optional. .lenv file configuration
-    - `enabled` (boolean): Enable .lenv loading (default: `true`)
-    - `path` (string): Path to .lenv file (default: `'.lenv'`)
-    - `override` (boolean): Override existing env vars (default: `true`)
-  - `env` (Object): Optional. dotenvx/.env configuration (DEPRECATED)
-    - `enabled` (boolean): Enable .env loading (default: `false`)
-    - `quiet` (boolean): Suppress deprecation warnings (default: `true`)
-  - `getenv` (Object): Optional. getenv helper configuration
-    - `enabled` (boolean): Enable getenv helper (default: `true`)
-  - `argv` (string[]): Optional. Custom argv to parse (default: `process.argv`)
-
-**Returns:** `Object` - Parsed configuration with camelCase keys
-
-**Example:**
+## Isolated contexts and automatic environment mapping
 
 ```javascript
 const config = makeConfig({
-  yargs: ({ yargs, getenv }) =>
-    yargs
-      .option('port', { type: 'number', default: getenv('PORT', 3000) })
-      .option('api-key', { type: 'string', default: getenv('API_KEY', '') })
-      .option('verbose', { type: 'boolean', default: false })
-});
-````
-
-### `getenv(name, defaultValue)`
-
-Smart environment variable lookup with type preservation and case conversion.
-
-**Built on [getenv](https://www.npmjs.com/package/getenv):** This function uses the official `getenv` npm package internally for robust type casting and validation, enhanced with case-insensitive lookup across multiple naming conventions.
-
-**Parameters:**
-
-- `name` (string): Environment variable name (any case format)
-- `defaultValue` (any): Default value if not found
-
-**Returns:** Same type as `defaultValue`
-
-**Example:**
-
-```javascript
-// All these work and return the same value:
-getenv('API_KEY', ''); // UPPER_CASE
-getenv('apiKey', ''); // camelCase
-getenv('api-key', ''); // kebab-case
-getenv('api_key', ''); // snake_case
-
-// Type preservation (powered by getenv package):
-getenv('PORT', 3000); // Returns number (uses getenv.int())
-getenv('DEBUG', false); // Returns boolean (uses getenv.boolish())
-getenv('API_KEY', ''); // Returns string (uses getenv.string())
-```
-
-### Case Conversion Utilities
-
-Utility functions for converting between naming conventions:
-
-- `toUpperCase(str)` - Convert to UPPER_CASE (environment variables)
-- `toCamelCase(str)` - Convert to camelCase (config object keys)
-- `toKebabCase(str)` - Convert to kebab-case (CLI options)
-- `toSnakeCase(str)` - Convert to snake_case
-- `toPascalCase(str)` - Convert to PascalCase
-
-**Example:**
-
-```javascript
-import { toUpperCase, toCamelCase, toKebabCase } from 'lino-arguments';
-
-toUpperCase('apiKey'); // 'API_KEY'
-toCamelCase('api-key'); // 'apiKey'
-toKebabCase('apiKey'); // 'api-key'
-```
-
-### Low-level APIs (Advanced Usage)
-
-These functions are available for advanced use cases but `makeConfig()` is recommended for most applications:
-
-#### `applyLinoEnv(filePath, options)`
-
-Apply `.lenv` file to `process.env`.
-
-#### `loadDotenvx(options)` (DEPRECATED)
-
-**⚠️ DEPRECATED:** Use `.lenv` files instead of `.env` files.
-
-## `.lenv` File Format
-
-The `.lenv` file uses Links Notation format with `: ` (colon-space) separator:
-
-```
-# Database configuration
-DATABASE_URL: postgresql://localhost:5432/myapp
-DATABASE_POOL_SIZE: 10
-
-# API Keys
-API_KEY: your_api_key_here
-SECRET_KEY: your_secret_key_here
-
-# Application settings
-APP_NAME: My Application
-APP_PORT: 3000
-```
-
-## Features
-
-### Multi-source Configuration Loading
-
-`makeConfig()` automatically loads and merges configuration from multiple sources with a clear priority chain:
-
-```javascript
-const config = makeConfig({
-  yargs: ({ yargs, getenv }) =>
-    yargs.option('port', { default: getenv('PORT', 3000) }),
-});
-```
-
-**Priority order (highest to lowest):**
-
-1. CLI arguments: `--port 8080`
-2. getenv defaults: `process.env.PORT`
-3. --configuration flag: `--configuration custom.lenv`
-4. .lenv file: Local environment overrides
-5. .env file: Base configuration (DEPRECATED)
-
-### Smart Environment Variable Lookup
-
-The `getenv()` helper automatically searches for environment variables in all common case formats:
-
-```javascript
-// If process.env.API_KEY = 'secret123'
-getenv('API_KEY', ''); // ✅ Found
-getenv('apiKey', ''); // ✅ Found (converted to API_KEY)
-getenv('api-key', ''); // ✅ Found (converted to API_KEY)
-getenv('api_key', ''); // ✅ Found (converted to API_KEY)
-```
-
-### Automatic Key Mapping
-
-CLI options in kebab-case are automatically converted to camelCase in the result:
-
-```bash
-$ node app.js --api-key mykey --max-connections 100
-```
-
-```javascript
-const config = makeConfig({
+  env: {
+    values: {
+      PORT: '8080',
+      VERBOSE: 'false',
+      START_URL: 'https://example.test',
+    },
+    autoMap: true,
+  },
+  cwd: '/app/config',
+  argv: ['node', 'app.js', '--port', '9090'],
   yargs: ({ yargs }) =>
     yargs
-      .option('api-key', { type: 'string' })
-      .option('max-connections', { type: 'number' }),
+      .option('port', { type: 'number', default: 3000 })
+      .option('verbose', { type: 'boolean', default: true })
+      .option('start-url', { type: 'string', env: 'START_URL' }),
 });
-
-console.log(config);
-// { apiKey: 'mykey', maxConnections: 100 }
+// { port: 9090, verbose: false, startUrl: 'https://example.test' }
 ```
 
-### Dynamic Configuration Files
+`env.values` is copied; resolution never obtains values from or exports values to the host environment. Two calls with separate maps/directories are independent. `cwd` resolves `.lenv`, `lenv.path`, `--configuration`/`-c`, and relative secret paths without changing the process directory.
 
-Use `--configuration` (or `-c`) to specify a different .lenv file at runtime:
+You can pass an environment map directly as `env: { PORT: '8080' }` or `env: {}`. Use `env.values` when the map could contain reserved settings keys (`enabled`, `quiet`, `autoMap`, `values`); a settings-only object with boolean settings keeps its legacy meaning. `env: { autoMap: true }` opts into mapping with the legacy process defaults. `env: { values: {} }` explicitly isolates an empty environment.
 
-```bash
-$ node app.js --configuration production.lenv
-```
+For isolated contexts, precedence from highest to lowest is:
 
-## Real-world Example
+1. Explicit CLI arguments.
+2. Injected `env`/`env.values`.
+3. The `.lenv` selected by `--configuration`/`-c`.
+4. The default `.lenv` (or `lenv.path`).
+5. Option defaults.
 
-Here's a complete example based on the [hive-mind](https://github.com/deep-assistant/hive-mind) pattern:
+`lenv.override` controls the legacy process exporter only. Missing/unreadable optional `.lenv` files are treated as empty by `LinoEnv.read()`. The implementation reuses `LinoEnv.read().toObject()` and adds no `.lenv` parser.
+
+Automatic mapping is opt-in. It maps only declared options: `job-application-interval` → `JOB_APPLICATION_INTERVAL`, `verbose` → `VERBOSE`. It supports `.option()`, `.options()`, shorthand type declarations, and synchronous command builders. Use `{ env: 'APP_START_URL' }` for an explicit variable name even without `autoMap`, or `{ env: false }` to disable mapping for one option. CLI aliases retain CLI priority. Native `yargs.env()` is rejected in isolated contexts because it reads the host environment.
+
+Mapped numbers accept finite decimal values; booleans accept `true`/`false` (case insensitive) and `1`/`0`; strings retain empty values. Array options accept comma-separated strings or array-valued object input. Invalid mapped values throw an error naming the key and type, without the value. Unknown environment keys never become options.
+
+Keys normalize across UPPER_CASE, camelCase, kebab-case, snake_case, and PascalCase. Multiple spellings of the same key **within one source** are ambiguous and rejected, even if the values are equal. Different sources can use different spellings and follow precedence. Conflicting option aliases are rejected too. Repeated identical `.lenv` keys retain LinoEnv's last-value behavior.
+
+## Opt-in secret files
 
 ```javascript
-import { makeConfig } from 'lino-arguments';
-
 const config = makeConfig({
-  yargs: ({ yargs, getenv }) =>
-    yargs
-      .option('port', {
-        type: 'number',
-        default: getenv('PORT', 3000),
-        describe: 'Server port',
-      })
-      .option('telegram-token', {
-        type: 'string',
-        default: getenv('TELEGRAM_TOKEN', ''),
-        describe: 'Telegram bot token',
-      })
-      .option('api-key', {
-        type: 'string',
-        default: getenv('API_KEY', ''),
-        describe: 'API authentication key',
-      })
-      .option('verbose', {
-        type: 'boolean',
-        default: false,
-        describe: 'Enable verbose logging',
-      })
-      .option('debug', {
-        type: 'boolean',
-        default: false,
-        describe: 'Enable debug mode',
-      }),
+  env: { values: { API_KEY_FILE: 'secrets/api-key' }, autoMap: true },
+  cwd: '/app',
+  secrets: { keys: ['API_KEY'] },
+  yargs: ({ yargs }) => yargs.option('api-key', { type: 'string' }),
 });
-
-// Start your application
-startServer(config);
 ```
 
-Create a `.lenv` file for local development:
+Only keys in `secrets.keys` can load a file; unrelated `*_FILE` variables are inert. A secret is read when its declared option or contextual `getenv` lookup needs it, and the result is cached within that call. File values never export to `process.env`. Explicit CLI values bypass automatic env mapping and unused files. A manual `getenv` call inside the callback resolves immediately, so use mapping for secrets that CLI should bypass.
 
+| Secret setting                 | Default and behavior                                                                                                                                                                                                           |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `keys`                         | Required allowlist, e.g. `['API_KEY']`; uses `API_KEY_FILE`. An object such as `{ API_KEY: 'TOKEN_PATH' }` selects a custom file variable.                                                                                     |
+| `readFile(path, { maxBytes })` | Optional synchronous injected reader returning a string or Uint8Array. The main entry otherwise uses its bounded Node filesystem adapter. A custom reader must honor the supplied bound; its returned content is also checked. |
+| `maxBytes`                     | 65536 bytes (64 KiB), valid range 1–16777216. Checked before newline removal, using UTF-8 bytes. The default adapter only reads regular files, allocating at most `maxBytes + 1` bytes.                                        |
+| `newline`                      | `'strip'`: removes exactly one terminal LF or CRLF. `'preserve'` retains it. BOM, spaces, interior newlines and extra trailing newlines remain. Invalid UTF-8 is rejected.                                                     |
+| `conflict`                     | `'error'`: both `NAME` and its file variable in the winning source throw. `'value'` prefers direct values (including empty strings). `'file'` prefers file contents.                                                           |
+
+Source precedence is applied to a direct value and its allowlisted file variable together: a higher-priority direct value overrides a lower-priority file, and a higher-priority file overrides a lower-priority direct value. Conflicts in unused lower sources do not cause reads or errors.
+
+Missing/unreadable/oversized secret files throw redacted errors. Paths, contents, and underlying reader error messages are omitted. Env defaults display `[environment]` in yargs help. With a secret allowlist, yargs validation failures use a generic error to prevent values appearing in error/help output. Application-supplied logging, callbacks and coercion functions remain the application's responsibility.
+
+Optional `trace(event)` receives only normalized key, source, and whether a file was used. Tracing is off by default; it never receives values or file paths.
+
+See [examples/isolated-contexts.js](examples/isolated-contexts.js) for a runnable example using generic fixtures.
+
+## Browser/WASM and plain objects
+
+Import the filesystem-free subpath for already-parsed objects:
+
+```javascript
+import { resolveConfig, createConfigContext } from 'lino-arguments/pure';
+
+const config = resolveConfig({
+  options: {
+    port: { type: 'number', default: 3000 },
+    'api-key': { type: 'string', env: 'TOKEN', default: '' },
+  },
+  lenv: { PORT: '5000' }, // Already parsed, e.g. LinoEnv.toObject().
+  configuration: {},
+  env: { TOKEN: '' },
+  argv: { port: 8080 }, // Already parsed CLI/options object.
+});
+// { port: 8080, apiKey: '' }
+
+const context = createConfigContext({ env: { PORT: '0' } });
+context.getenv('port', 3000); // 0
 ```
+
+`resolveConfig` maps its declared schema automatically unless `autoMap: false`. `createConfigContext` exposes `getenv(name, fallback)` and `lookup(name)`; the latter returns `{ found, value }` for present keys. Both accept `env`, `lenv`, `configuration`, `secrets`, `cwd`, `readFile`, `resolvePath`, and `trace`, with the same precedence/conflict rules. The pure entry has no Node imports, process access, yargs or filesystem defaults. Secret files require an injected reader. It does not parse CLI strings or raw `.lenv` text; parse those with the existing runtime APIs first. For CLI aliases, use the yargs entry; the pure schema receives canonical option names.
+
+The main entry imports Node filesystem adapters through lino-env/yargs. Browser/WASM applications should import `lino-arguments/pure`.
+
+## API reference
+
+`makeConfig({ yargs, env, cwd, argv, lenv, getenv, secrets, trace })` returns parsed camelCase options. `yargs` is an optional callback receiving `{ yargs, getenv }`. `argv` retains the existing full process-style array convention, including executable/script slots. `getenv.enabled: false` disables the callback helper. `lenv.enabled: false` disables default `.lenv` loading; explicit `--configuration` still loads its file. `lenv.quiet: false` enables compatibility loading notices.
+
+`getenv(name, defaultValue = '', { env, ...contextOptions }?)` uses the process environment by default or an injected map when provided. The type of the default determines conversion: integer defaults require an integer, fractional defaults allow floats, and boolean defaults use boolish conversion. Invalid values return the fallback; empty strings, false and zero are preserved when valid for that type. Ambiguous aliases throw.
+
+`applyLinoEnv(path, { override: false, quiet: false })` is the explicit compatibility exporter. It normalizes names to UPPER_CASE in `process.env`; `override: false` preserves defined values, including empty strings.
+
+`await loadDotenvx(options)` is the deprecated optional `.env` exporter. Existing `env: { enabled: true, quiet: true }` remains supported, but `makeConfig` is synchronous and cannot await its import. Await `loadDotenvx()` before `makeConfig()` when deterministic `.env` loading is needed. Injected contexts reject `enabled: true`; supply an already-parsed environment map instead.
+
+`Parser`, `LinoEnv`, and `yargs` remain exported. `parseLinoArguments(text)` retains the legacy flat argument API. `toUpperCase`, `toCamelCase`, `toKebabCase`, `toSnakeCase`, and `toPascalCase` remain available; parsed result keys normalize through kebab-case before camelCase conversion.
+
+## `.lenv` format
+
+```text
 PORT: 3000
-TELEGRAM_TOKEN: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
-API_KEY: dev_key_12345
+VERBOSE: false
+API_KEY_FILE: secrets/api-key
 ```
 
-Override values via CLI:
+The separator is colon followed by a space. Blank lines and comments are ignored. Values retain their spaces.
 
-```bash
-$ node app.js --port 8080 --verbose
-```
+## Built-in yargs flags
 
-## Disabling Built-in Yargs Flags
-
-By default, yargs automatically adds `--version` and `--help` flags to your CLI. If you need to define your own `--version` or `--help` options, you can disable these built-in flags by calling `.version(false)` and `.help(false)` on the yargs instance:
+Disable reserved flags when defining your own options of the same name:
 
 ```javascript
-const config = makeConfig({
+makeConfig({
   yargs: ({ yargs }) =>
-    yargs
-      .version(false) // Disable built-in --version flag
-      .help(false) // Disable built-in --help flag
-      .option('version', {
-        type: 'string',
-        description: 'Release version to process',
-      })
-      .option('repository', {
-        type: 'string',
-        description: 'Repository name',
-      })
-      .strict(),
-});
-
-// Now you can use --version as your own option:
-// $ node script.js --version "1.2.3" --repository "my-repo"
-// config.version === "1.2.3" ✅
-```
-
-**Why would you need this?**
-
-When you try to define your own `--version` option without disabling the built-in flag, you'll encounter conflicts:
-
-```bash
-# With strict mode - throws error
-$ node script.js --version "1.2.3" --repository "my-repo"
-# Error: Unknown argument: 1.2.3
-
-# Without strict mode - incorrect parsing
-$ node script.js --version "1.2.3"
-# config.version === false (instead of "1.2.3")
-```
-
-**Enabling built-in flags (default behavior):**
-
-If you want to use yargs' built-in `--version` and `--help` flags with custom behavior, you can enable them explicitly:
-
-```javascript
-const config = makeConfig({
-  yargs: ({ yargs }) =>
-    yargs
-      .version('1.0.0') // Enable --version with custom version string
-      .help() // Enable --help with default help text
-      .option('port', { type: 'number', default: 3000 }),
+    yargs.version(false).help(false).option('version', { type: 'string' }),
 });
 ```
 
-See [examples/enable-version-and-help.js](examples/enable-version-and-help.js) for more examples.
+To use yargs' built-in behavior, call `.version('1.0.0').help()`. See [examples/enable-version-and-help.js](examples/enable-version-and-help.js).
 
-## Testing
+## Language boundaries
 
-The library uses [test-anywhere](https://github.com/link-foundation/test-anywhere) for testing across multiple JavaScript runtimes:
+These isolated contexts, pure object resolution, and secret-file settings are JavaScript APIs. The Rust package continues using clap and process environment loaders; its existing automatic option-to-env mapping is separate and does not provide these isolated/secret-file contracts. This repository has no Python implementation.
+
+Direct dependencies use yargs ^18.2.0 and links-notation ^0.23.0. Published lino-env 0.2.8 still depends on links-notation ^0.11.2; that transitive duplicate requires an upstream lino-env release. This package does not force an incompatible override.
+
+## Development and testing
+
+Use Node.js 24 and npm >=10.9.0 for lint/release tools. Tests use [test-anywhere](https://github.com/link-foundation/test-anywhere).
 
 ```bash
-# Run tests on Node.js
+npm ci
 npm test
-
-# Run tests on Bun
 bun test
-
-# Run tests on Deno
 deno test --allow-read --allow-write --allow-env
-```
-
-## Development
-
-Use Node.js 24 and npm >=10.9.0 for the current lint and release tools.
-
-```bash
-# Install dependencies
-npm install
-
-# Run tests
-npm test
-
-# Run linting
-npm run lint
-
-# Check formatting
-npm run format:check
-
-# Fix formatting
-npm run format
-
-# Check file size limits
-npm run check:file-size
-
-# Fail when any runtime, optional peer, or development dependency is outdated
+npm run check
 npm run check:dependencies
+npm run test:release
+# Pure resolver runs without fs/env permissions:
+deno run --no-config ../experiments/test-pure-resolution.mjs
 ```
 
-## Contributing
+We use [Changesets](https://github.com/changesets/changesets) for versioning. Add exactly one changeset per PR (`npm run changeset`); CI versions and publishes on merge. Manual edits to the package version are prohibited by CI.
 
-We use [changesets](https://github.com/changesets/changesets) for version management:
+## Related projects
 
-```bash
-# Create a changeset
-npm run changeset
-
-# Check changeset status
-npm run changeset:status
-```
-
-## Related Projects
-
-- [links-notation](https://github.com/link-foundation/links-notation) - Links Notation parser
-- [lino-env](https://github.com/link-foundation/lino-env) - .lenv file operations
-- [test-anywhere](https://github.com/link-foundation/test-anywhere) - Universal JavaScript testing
-- [getenv](https://www.npmjs.com/package/getenv) - Environment variable helper with type casting (used internally)
+- [links-notation](https://github.com/link-foundation/links-notation)
+- [lino-env](https://github.com/link-foundation/lino-env)
+- [getenv](https://github.com/ctavan/node-getenv)
 
 ## License
 
-This is free and unencumbered software released into the public domain. See the [LICENSE](LICENSE) file for details.
+Public domain under the [Unlicense](../LICENSE).

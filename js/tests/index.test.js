@@ -203,12 +203,18 @@ describe('getenv', () => {
     }
   });
 
-  it('should try original key first', () => {
+  it('should reject ambiguous original and uppercase aliases', () => {
     cleanupTestVars();
     try {
       process.env.myKey = 'original';
       process.env.MY_KEY = 'upper';
-      expect(getenv('myKey')).toBe('original');
+      let rejected = false;
+      try {
+        getenv('myKey');
+      } catch {
+        rejected = true;
+      }
+      expect(rejected).toBe(true);
     } finally {
       restoreEnv();
     }

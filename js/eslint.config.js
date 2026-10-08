@@ -18,6 +18,8 @@ export default [
         console: 'readonly',
         process: 'readonly',
         Buffer: 'readonly',
+        TextEncoder: 'readonly',
+        TextDecoder: 'readonly',
         __dirname: 'readonly',
         __filename: 'readonly',
         fetch: 'readonly', // Node.js 18+ and modern runtimes

@@ -12,11 +12,19 @@ on:
     paths:
       - 'js/**'
       - '.github/workflows/js.yml'
+      - 'scripts/**'
+      - 'experiments/test-js-release.mjs'
+      - 'experiments/test-release-preparation.mjs'
+      - 'experiments/test-pure-resolution.mjs'
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - 'js/**'
       - '.github/workflows/js.yml'
+      - 'scripts/**'
+      - 'experiments/test-js-release.mjs'
+      - 'experiments/test-release-preparation.mjs'
+      - 'experiments/test-pure-resolution.mjs'
   workflow_dispatch:
     inputs:
       release_mode:
@@ -66,6 +74,21 @@ jobs:
 
       - name: Check runtime, peer, and development dependencies
         run: npm run check:dependencies
+
+  release-scripts:
+    name: Release Script Regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24.x'
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify JS-only versioning and complete release path
+        run: npm run test:release
 
   # === DETECT CHANGES - determines which jobs should run ===
   detect-changes:
@@ -208,6 +231,7 @@ jobs:
   # Test matrix: 3 runtimes (Node.js, Bun, Deno) x 3 OS (Ubuntu, macOS, Windows)
   test:
     name: Test (${{ matrix.runtime }} on ${{ matrix.os }})
+    timeout-minutes: 15
     runs-on: ${{ matrix.os }}
     needs: [detect-changes, changeset-check]
     # Run if: push event, OR changeset-check succeeded, OR changeset-check was skipped (docs-only PR or no JS changes)
@@ -274,12 +298,16 @@ jobs:
         if: matrix.runtime == 'deno'
         run: deno test --allow-read --allow-env --allow-write
 
+      - name: Verify pure resolver without filesystem or environment permissions
+        if: matrix.runtime == 'deno'
+        run: deno run --no-config ../experiments/test-pure-resolution.mjs
+
   # Release - only runs on main after tests pass (for push events)
   release:
     name: Release
-    needs: [lint, test, dependencies]
+    needs: [lint, test, dependencies, release-scripts]
     # Use always() to ensure this job runs even if changeset-check was skipped
-    if: always() && !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.lint.result == 'success' && needs.test.result == 'success' && needs.dependencies.result == 'success'
+    if: always() && !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.lint.result == 'success' && needs.test.result == 'success' && needs.dependencies.result == 'success' && needs.release-scripts.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -381,8 +409,8 @@ jobs:
   # Manual Instant Release
   instant-release:
     name: Instant Release
-    needs: [lint, test, dependencies]
-    if: always() && !cancelled() && github.event_name == 'workflow_dispatch' && github.event.inputs.release_mode == 'instant' && needs.lint.result == 'success' && needs.test.result == 'success' && needs.dependencies.result == 'success'
+    needs: [lint, test, dependencies, release-scripts]
+    if: always() && !cancelled() && github.event_name == 'workflow_dispatch' && github.event.inputs.release_mode == 'instant' && needs.lint.result == 'success' && needs.test.result == 'success' && needs.dependencies.result == 'success' && needs.release-scripts.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
