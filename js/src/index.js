@@ -75,15 +75,17 @@ export function getenv(key, defaultValue = '', options) {
     toPascalCase(key), // PascalCase
   ];
 
-  const matches = new Set(
-    variants.filter((variant) => process.env[variant] !== undefined)
+  // Windows can resolve several spellings to a single environment entry.
+  // Count stored keys, rather than successful lookups, to detect ambiguity.
+  const matches = Object.keys(process.env).filter(
+    (name) => toUpperCase(name) === toUpperCase(key)
   );
-  if (matches.size > 1) {
+  if (matches.length > 1) {
     throw new Error(`Ambiguous environment aliases for ${toUpperCase(key)}`);
   }
 
   // Try to find the variable using any case variant
-  for (const variant of variants) {
+  for (const variant of new Set([...variants, ...matches])) {
     if (process.env[variant] !== undefined) {
       // Use the official getenv package based on the type of defaultValue
       try {

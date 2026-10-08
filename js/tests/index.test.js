@@ -226,8 +226,15 @@ describe('getenv', () => {
 // ============================================================================
 
 describe('makeConfig', () => {
-  const testLenvFile = join(process.cwd(), '.test-makeconfig.lenv');
-  const testConfigFile = join(process.cwd(), '.test-config.lenv');
+  // Runtime checks may share a checkout; keep their temporary files separate.
+  const testLenvFile = join(
+    process.cwd(),
+    `.test-makeconfig-${process.pid}.lenv`
+  );
+  const testConfigFile = join(
+    process.cwd(),
+    `.test-config-${process.pid}.lenv`
+  );
   const originalEnv = { ...process.env };
 
   function cleanupTestEnv() {

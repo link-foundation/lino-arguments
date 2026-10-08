@@ -400,6 +400,24 @@ describe('allowlisted secret files', () => {
 });
 
 describe('additional precedence and alias regressions', () => {
+  it('counts actual keys when the host environment lookup ignores case', () => {
+    const previous = process.env;
+    process.env = new Proxy(
+      { TEST_VAR: '7' },
+      {
+        get: (target, key) =>
+          Object.entries(target).find(
+            ([name]) => name.toLowerCase() === String(key).toLowerCase()
+          )?.[1],
+      }
+    );
+    try {
+      assert.equal(getenv('testVar', 1), 7);
+    } finally {
+      process.env = previous;
+    }
+  });
+
   it('keeps built-in help/version flags out of environment mapping and redaction', () => {
     const warnings = [];
     const original = process.emitWarning;
