@@ -203,12 +203,18 @@ describe('getenv', () => {
     }
   });
 
-  it('should try original key first', () => {
+  it('should reject ambiguous original and uppercase aliases', () => {
     cleanupTestVars();
     try {
       process.env.myKey = 'original';
       process.env.MY_KEY = 'upper';
-      expect(getenv('myKey')).toBe('original');
+      let rejected = false;
+      try {
+        getenv('myKey');
+      } catch {
+        rejected = true;
+      }
+      expect(rejected).toBe(true);
     } finally {
       restoreEnv();
     }
@@ -220,8 +226,15 @@ describe('getenv', () => {
 // ============================================================================
 
 describe('makeConfig', () => {
-  const testLenvFile = join(process.cwd(), '.test-makeconfig.lenv');
-  const testConfigFile = join(process.cwd(), '.test-config.lenv');
+  // Runtime checks may share a checkout; keep their temporary files separate.
+  const testLenvFile = join(
+    process.cwd(),
+    `.test-makeconfig-${process.pid}.lenv`
+  );
+  const testConfigFile = join(
+    process.cwd(),
+    `.test-config-${process.pid}.lenv`
+  );
   const originalEnv = { ...process.env };
 
   function cleanupTestEnv() {

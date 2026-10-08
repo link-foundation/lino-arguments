@@ -51,14 +51,18 @@ const tagPrefix = getArg('tag-prefix', process.env.TAG_PREFIX || 'v');
 const releaseLabel = getArg('release-label', process.env.RELEASE_LABEL || '');
 const mode = getArg('mode', process.env.VERSION_MODE || 'rust');
 
-// Get Rust package root (auto-detect or use explicit config)
-const rustRootConfig = parseRustRootConfig();
-const rustRoot = getRustRoot({ rustRoot: rustRootConfig || undefined, verbose: true });
-
-// Get paths based on detected/configured rust root
-const CARGO_TOML = getCargoTomlPath({ rustRoot });
-const CHANGELOG_DIR = getChangelogDir({ rustRoot });
-const CHANGELOG_FILE = getChangelogPath({ rustRoot });
+// JavaScript modes must work in JS-only repositories and from js/.
+// Defer Rust detection completely unless the selected mode uses Cargo.
+let CARGO_TOML;
+let CHANGELOG_DIR;
+let CHANGELOG_FILE;
+if (mode !== 'changeset' && mode !== 'instant') {
+  const rustRootConfig = parseRustRootConfig();
+  const rustRoot = getRustRoot({ rustRoot: rustRootConfig || undefined, verbose: true });
+  CARGO_TOML = getCargoTomlPath({ rustRoot });
+  CHANGELOG_DIR = getChangelogDir({ rustRoot });
+  CHANGELOG_FILE = getChangelogPath({ rustRoot });
+}
 
 // In changeset mode, bump type is determined by changesets, not required as input
 if (mode !== 'changeset' && mode !== 'instant' && (!bumpType || !['major', 'minor', 'patch'].includes(bumpType))) {

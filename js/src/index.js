@@ -3,6 +3,18 @@ import { LinoEnv } from 'lino-env';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import baseGetenv from 'getenv';
+import { resolve } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
+import {
+  toUpperCase,
+  toCamelCase,
+  toKebabCase,
+  toSnakeCase,
+  toPascalCase,
+} from './case.js';
+import { createConfigContext, normalizeEnvironment } from './pure.js';
+import { readSecretFile } from './files.js';
+import { mapEnvironmentOptions } from './options.js';
 
 /**
  * lino-arguments - A unified configuration library
@@ -10,98 +22,21 @@ import baseGetenv from 'getenv';
  * Combines Links Notation Environment (lenv), dotenvx, and yargs into a single
  * easy-to-use configuration system with clear priority ordering.
  *
- * Priority (highest to lowest):
- * 1. CLI arguments (manually entered options)
- * 2. getenv defaults (from process.env, set by previous steps)
- * 3. --configuration option (lenv file specified via CLI)
- * 4. .lenv file (local environment overrides)
- * 5. dotenvx/.env file (base configuration, DEPRECATED)
+ * Isolated priority: CLI > env > --configuration > .lenv > defaults.
+ * Legacy calls preserve process exports and lenv.override semantics.
  */
 
 // ============================================================================
 // Case Conversion Utilities
 // ============================================================================
 
-/**
- * Convert string to UPPER_CASE (for environment variables)
- * @param {string} str - Input string
- * @returns {string} UPPER_CASE string
- */
-export function toUpperCase(str) {
-  // If already all uppercase, just replace separators
-  if (str === str.toUpperCase()) {
-    return str.replace(/[-\s]/g, '_');
-  }
-
-  return str
-    .replace(/([A-Z])/g, '_$1') // PascalCase/camelCase
-    .replace(/[-\s]/g, '_') // kebab-case/spaces
-    .toUpperCase()
-    .replace(/^_/, '') // Remove leading underscore
-    .replace(/__+/g, '_'); // Remove double underscores
-}
-
-/**
- * Convert string to camelCase (for config object keys)
- * @param {string} str - Input string
- * @returns {string} camelCase string
- */
-export function toCamelCase(str) {
-  return str
-    .toLowerCase()
-    .replace(/[-_\s]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ''))
-    .replace(/^[A-Z]/, (c) => c.toLowerCase());
-}
-
-/**
- * Convert string to kebab-case (for CLI options)
- * @param {string} str - Input string
- * @returns {string} kebab-case string
- */
-export function toKebabCase(str) {
-  // If already all uppercase, handle specially
-  if (str === str.toUpperCase() && str.includes('_')) {
-    return str.replace(/_/g, '-').toLowerCase();
-  }
-
-  return str
-    .replace(/([A-Z])/g, '-$1')
-    .replace(/[_\s]/g, '-')
-    .toLowerCase()
-    .replace(/^-/, '')
-    .replace(/--+/g, '-');
-}
-
-/**
- * Convert string to snake_case
- * @param {string} str - Input string
- * @returns {string} snake_case string
- */
-export function toSnakeCase(str) {
-  // If already all uppercase, just lowercase
-  if (str === str.toUpperCase() && str.includes('_')) {
-    return str.toLowerCase();
-  }
-
-  return str
-    .replace(/([A-Z])/g, '_$1')
-    .replace(/[-\s]/g, '_')
-    .toLowerCase()
-    .replace(/^_/, '')
-    .replace(/__+/g, '_');
-}
-
-/**
- * Convert string to PascalCase
- * @param {string} str - Input string
- * @returns {string} PascalCase string
- */
-export function toPascalCase(str) {
-  return str
-    .toLowerCase()
-    .replace(/[-_\s]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ''))
-    .replace(/^[a-z]/, (c) => c.toUpperCase());
-}
+export {
+  toUpperCase,
+  toCamelCase,
+  toKebabCase,
+  toSnakeCase,
+  toPascalCase,
+} from './case.js';
 
 // ============================================================================
 // Environment Variable Helper
@@ -121,7 +56,16 @@ export function toPascalCase(str) {
  * const apiKey = getenv('apiKey', 'default-key');
  * const port = getenv('PORT', 3000); // Returns number if env var is numeric
  */
-export function getenv(key, defaultValue = '') {
+export function getenv(key, defaultValue = '', options) {
+  if (options) {
+    return createConfigContext({
+      readFile: readSecretFile,
+      resolvePath: resolve,
+      cwd: process.cwd(),
+      ...options,
+      env: Object.hasOwn(options, 'env') ? options.env : process.env,
+    }).getenv(key, defaultValue);
+  }
   // Try different case formats
   const variants = [
     key, // Original
@@ -132,8 +76,17 @@ export function getenv(key, defaultValue = '') {
     toPascalCase(key), // PascalCase
   ];
 
+  // Windows can resolve several spellings to a single environment entry.
+  // Count stored keys, rather than successful lookups, to detect ambiguity.
+  const matches = Object.keys(process.env).filter(
+    (name) => toUpperCase(name) === toUpperCase(key)
+  );
+  if (matches.length > 1) {
+    throw new Error(`Ambiguous environment aliases for ${toUpperCase(key)}`);
+  }
+
   // Try to find the variable using any case variant
-  for (const variant of variants) {
+  for (const variant of new Set([...variants, ...matches])) {
     if (process.env[variant] !== undefined) {
       // Use the official getenv package based on the type of defaultValue
       try {
@@ -192,7 +145,7 @@ function loadLinoEnv(filePath = '.lenv') {
  * @param {boolean} options.quiet - Suppress output (default: false)
  * @returns {Object} Object containing all loaded environment variables
  */
-function applyLinoEnv(filePath = '.lenv', options = {}) {
+export function applyLinoEnv(filePath = '.lenv', options = {}) {
   const { override = false, quiet = false } = options;
 
   try {
@@ -201,14 +154,14 @@ function applyLinoEnv(filePath = '.lenv', options = {}) {
       return {};
     }
 
-    const envObject = env.toObject();
+    const envObject = normalizeEnvironment(env.toObject());
     const loaded = {};
 
     for (const [key, value] of Object.entries(envObject)) {
       // Convert all keys to UPPER_CASE for process.env
       const upperKey = toUpperCase(key);
 
-      if (override || !process.env[upperKey]) {
+      if (override || process.env[upperKey] === undefined) {
         process.env[upperKey] = value;
         loaded[upperKey] = value;
       }
@@ -221,11 +174,8 @@ function applyLinoEnv(filePath = '.lenv', options = {}) {
     }
 
     return loaded;
-  } catch (error) {
-    if (!quiet) {
-      console.error(`⚠️  Failed to load ${filePath}:`, error.message);
-    }
-    return {};
+  } catch {
+    throw new Error('Invalid .lenv environment aliases');
   }
 }
 
@@ -236,7 +186,7 @@ function applyLinoEnv(filePath = '.lenv', options = {}) {
  * @param {boolean} options.quiet - Suppress warnings (default: false)
  * @returns {Object} Result from dotenvx.config()
  */
-async function loadDotenvx(options = {}) {
+export async function loadDotenvx(options = {}) {
   const { quiet = false } = options;
 
   if (!quiet) {
@@ -263,124 +213,171 @@ async function loadDotenvx(options = {}) {
 // ============================================================================
 
 /**
- * Create unified configuration from multiple sources
+ * Resolve CLI options using an injected env/cwd context or legacy process defaults.
+ * Isolated precedence: CLI > env > --configuration > .lenv > option defaults.
+ * Legacy mode keeps process exports and lenv.override semantics.
  *
- * Priority (highest to lowest):
- * 1. CLI arguments (manually entered)
- * 2. getenv defaults (from process.env)
- * 3. --configuration flag (dynamic .lenv file)
- * 4. .lenv file
- * 5. dotenvx/.env file (DEPRECATED)
- *
- * @param {Object} config - Configuration object
- * @param {Function} config.yargs - Yargs configuration function: ({ yargs, getenv }) => yargs
- * @param {Object} [config.lenv] - Lino-env configuration
- * @param {boolean} [config.lenv.enabled=true] - Enable .lenv loading
- * @param {string} [config.lenv.path='.lenv'] - Path to .lenv file
- * @param {boolean} [config.lenv.override=true] - Override existing env vars
- * @param {Object} [config.env] - Dotenvx/.env configuration (DEPRECATED)
- * @param {boolean} [config.env.enabled=false] - Enable .env loading
- * @param {Object} [config.getenv] - Getenv configuration
- * @param {boolean} [config.getenv.enabled=true] - Enable getenv helper
- * @param {string[]} [config.argv] - Custom argv to parse (default: process.argv)
- * @returns {Object} Parsed configuration object with camelCase keys
- *
- * @example
- * // Hero example (defaults)
- * const config = makeConfig({
- *   yargs: ({ yargs, getenv }) => yargs
- *     .option('port', { type: 'number', default: getenv('PORT', 3000) })
- *     .option('verbose', { type: 'boolean', default: false })
- * });
- *
- * @example
- * // Explicit configuration
- * const config = makeConfig({
- *   lenv: { enabled: true },
- *   env: { enabled: true },
- *   getenv: { enabled: true },
- *   yargs: ({ yargs, getenv }) => yargs
- *     .option('api-key', { type: 'string', default: getenv('API_KEY', '') })
- *     .option('port', { type: 'number', default: getenv('PORT', 3000) })
- * });
+ * @param {Object} config
+ * @param {Object} [config.env] Environment map, or {values, autoMap, enabled, quiet}
+ * @param {string} [config.cwd] Base directory (default: process.cwd())
+ * @param {string[]} [config.argv] Full process-style argv (default: process.argv)
+ * @param {Function} [config.yargs] Callback receiving { yargs, getenv }
+ * @param {Object} [config.lenv] Default file settings: enabled, path, override, quiet
+ * @param {Object} [config.getenv] Callback helper settings: enabled
+ * @param {Object} [config.secrets] Allowlist, bounded reader, conflict/newline policies
+ * @param {Function} [config.trace] Optional key/source tracing, without values
+ * @returns {Object} Parsed camelCase options
  */
 export function makeConfig(config = {}) {
   const {
-    yargs: yargsConfigFn,
+    yargs: configure,
     lenv = {},
-    env = {},
-    getenv: getenvConfig = {},
+    getenv: getenvOptions = {},
+    secrets,
     argv = process.argv,
+    cwd = process.cwd(),
   } = config;
-
-  // Default options
-  const lenvEnabled = lenv.enabled !== false; // Default: true
-  const lenvPath = lenv.path || '.lenv';
-  const lenvOverride = lenv.override !== false; // Default: true
-
-  const envEnabled = env.enabled === true; // Default: false
-  const envQuiet = env.quiet !== false; // Default: true
-
-  const getenvEnabled = getenvConfig.enabled !== false; // Default: true
-
-  // Step 1: Load dotenvx/.env (DEPRECATED, lowest priority)
-  if (envEnabled) {
-    loadDotenvx({ quiet: envQuiet });
+  const input = config.env;
+  // Keep the deprecated env settings object, while accepting env maps directly.
+  const settingsKeys = ['enabled', 'quiet', 'autoMap', 'values'];
+  const isSettings =
+    input &&
+    Object.keys(input).length > 0 &&
+    Object.keys(input).every((key) => settingsKeys.includes(key)) &&
+    Object.entries(input).every(
+      ([key, value]) => key === 'values' || typeof value === 'boolean'
+    );
+  const envSettings = isSettings ? input : {};
+  const isolated =
+    Object.hasOwn(envSettings, 'values') ||
+    (Object.hasOwn(config, 'env') && !isSettings);
+  const environment = isolated
+    ? Object.hasOwn(envSettings, 'values')
+      ? (envSettings.values ?? {})
+      : (input ?? {})
+    : process.env;
+  if (isolated && envSettings.enabled) {
+    throw new Error(
+      'Use loadDotenvx separately; isolated configuration accepts parsed env values'
+    );
   }
-
-  // Step 2: Load .lenv file (overrides .env)
-  if (lenvEnabled) {
-    applyLinoEnv(lenvPath, { override: lenvOverride, quiet: false });
+  if (!isolated && envSettings.enabled) {
+    loadDotenvx({
+      quiet: envSettings.quiet !== false,
+      path: resolve(cwd, '.env'),
+    });
   }
-
-  // Step 3: Parse initial CLI args to check for --configuration
-  const initialYargs = yargs(hideBin(argv))
+  const initial = yargs(hideBin(argv), cwd)
+    .detectLocale(!isolated)
+    .option('configuration', {
+      type: 'string',
+      alias: 'c',
+    })
+    .help(false)
+    .version(false)
+    .exitProcess(false);
+  let initialParsed;
+  try {
+    initialParsed = initial.parseSync();
+  } catch {
+    initialParsed = {};
+  }
+  const defaultPath = resolve(cwd, lenv.path || '.lenv');
+  const selectedPath = initialParsed.configuration
+    ? resolve(cwd, initialParsed.configuration)
+    : undefined;
+  let context;
+  if (isolated) {
+    context = createConfigContext({
+      env: environment,
+      lenv: lenv.enabled === false ? {} : loadLinoEnv(defaultPath)?.toObject(),
+      configuration: selectedPath ? loadLinoEnv(selectedPath)?.toObject() : {},
+      cwd,
+      resolvePath: resolve,
+      readFile: readSecretFile,
+      secrets,
+      trace: config.trace,
+    });
+  } else {
+    if (lenv.enabled !== false) {
+      applyLinoEnv(defaultPath, {
+        override: lenv.override !== false,
+        quiet: lenv.quiet !== false,
+      });
+    }
+    if (selectedPath) {
+      applyLinoEnv(selectedPath, {
+        override: true,
+        quiet: lenv.quiet !== false,
+      });
+    }
+    context = createConfigContext({
+      env: process.env,
+      cwd,
+      resolvePath: resolve,
+      readFile: readSecretFile,
+      secrets,
+      trace: config.trace,
+    });
+  }
+  const instance = yargs(hideBin(argv), cwd)
+    .detectLocale(!isolated)
     .option('configuration', {
       type: 'string',
       describe: 'Path to configuration .lenv file',
       alias: 'c',
-    })
-    .help(false) // Disable help for initial parse
-    .version(false) // Disable version for initial parse
-    .exitProcess(false); // Don't exit on parse errors
-
-  let initialParsed;
-  try {
-    initialParsed = initialYargs.parseSync();
-  } catch {
-    initialParsed = {};
+    });
+  if (isolated) {
+    const nativeEnv = instance.env.bind(instance);
+    instance.env = (prefix) => {
+      if (prefix !== false) {
+        throw new Error(
+          'Native yargs.env reads the host; use env.autoMap or option env instead'
+        );
+      }
+      return nativeEnv(false);
+    };
   }
-
-  // Step 4: Load --configuration file if specified (overrides default .lenv)
-  if (initialParsed.configuration) {
-    applyLinoEnv(initialParsed.configuration, { override: true, quiet: false });
-  }
-
-  // Step 5: Configure yargs with user options + getenv helper
-  const yargsInstance = yargs(hideBin(argv)).option('configuration', {
-    type: 'string',
-    describe: 'Path to configuration .lenv file',
-    alias: 'c',
+  // Wrap only metadata registration; yargs still parses and validates arguments.
+  const applyMapping = mapEnvironmentOptions(instance, context, {
+    autoMap: envSettings.autoMap === true,
+    cli: initialParsed,
+    redactDefaults: Boolean(secrets?.keys),
   });
-
-  // Pass getenv helper if enabled
-  const getenvHelper = getenvEnabled ? getenv : () => '';
-  const configuredYargs = yargsConfigFn
-    ? yargsConfigFn({ yargs: yargsInstance, getenv: getenvHelper })
-    : yargsInstance;
-
-  // Step 6: Parse final configuration (CLI args have highest priority)
-  const parsed = configuredYargs.parseSync();
-
-  // Step 7: Convert kebab-case keys to camelCase for result object
+  const helper = getenvOptions.enabled === false ? () => '' : context.getenv;
+  const parser = configure
+    ? configure({ yargs: instance, getenv: helper })
+    : instance;
+  applyMapping(parser);
+  if (secrets?.keys) {
+    // yargs otherwise prints values in choices/coercion errors and help defaults.
+    parser.fail(() => {
+      throw new Error('Invalid configuration for declared options');
+    });
+  }
+  const parsed = parser.parseSync();
   const result = {};
+  const normalized = new Map();
   for (const [key, value] of Object.entries(parsed)) {
     if (key !== '_' && key !== '$0') {
-      const camelKey = toCamelCase(key);
-      result[camelKey] = value;
+      const camelKey = toCamelCase(toKebabCase(key));
+      if (
+        normalized.has(camelKey) &&
+        !isDeepStrictEqual(normalized.get(camelKey), value)
+      ) {
+        throw new Error(
+          `Ambiguous configuration aliases for ${toUpperCase(key)}`
+        );
+      }
+      normalized.set(camelKey, value);
+      Object.defineProperty(result, camelKey, {
+        value,
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
     }
   }
-
   return result;
 }
 
@@ -443,3 +440,4 @@ export function parseLinoArguments(linoString) {
 export { Parser } from 'links-notation';
 export { LinoEnv } from 'lino-env';
 export { yargs };
+export { createConfigContext, resolveConfig } from './pure.js';

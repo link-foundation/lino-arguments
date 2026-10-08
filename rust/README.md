@@ -17,6 +17,14 @@ A unified configuration library combining environment variables and CLI argument
 4. **`.env` file** - Standard dotenv file (for compatibility)
 5. **Default values** - Fallback values
 
+## Capability boundary
+
+The isolated env/cwd contexts, filesystem-free object resolver, and allowlisted
+secret-file schema described in the JavaScript documentation are JavaScript
+APIs. Rust continues using clap's env mapping and the process environment
+loaders documented here. It does not currently provide those isolation or
+secret-file contracts. This repository has no Python implementation.
+
 ## Installation
 
 Add to your `Cargo.toml`:

@@ -38,12 +38,15 @@ const tagPrefix = getArg('tag-prefix', process.env.TAG_PREFIX || 'v');
 const cratesIoUrl = getArg('crates-io-url', process.env.CRATES_IO_URL || '');
 const releaseLabel = getArg('release-label', process.env.RELEASE_LABEL || '');
 
-// Get Rust package root (auto-detect or use explicit config)
-const rustRootConfig = parseRustRootConfig();
-const rustRoot = getRustRoot({ rustRoot: rustRootConfig || undefined, verbose: true });
-
-// Get paths based on detected/configured rust root
-const CHANGELOG_FILE = getChangelogPath({ rustRoot });
+// JavaScript releases use Changesets' changelog, without requiring Cargo.toml.
+let CHANGELOG_FILE;
+if (releaseLabel === 'JavaScript' || tagPrefix === 'js_') {
+  CHANGELOG_FILE = existsSync('package.json') ? 'CHANGELOG.md' : 'js/CHANGELOG.md';
+} else {
+  const rustRootConfig = parseRustRootConfig();
+  const rustRoot = getRustRoot({ rustRoot: rustRootConfig || undefined, verbose: true });
+  CHANGELOG_FILE = getChangelogPath({ rustRoot });
+}
 
 if (!version || !repository) {
   console.error('Error: Missing required arguments');
@@ -72,7 +75,8 @@ function getChangelogForVersion(version) {
   // Find the section for this version
   const escapedVersion = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(
-    `## \\[${escapedVersion}\\].*?\\n([\\s\\S]*?)(?=\\n## \\[|$)`
+    `^## (?:\\[${escapedVersion}\\]|${escapedVersion})(?:[ \\t][^\\n]*)?\\n([\\s\\S]*?)(?=^## |$(?![\\s\\S]))`,
+    'm'
   );
   const match = content.match(pattern);
 

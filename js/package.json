@@ -5,10 +5,12 @@
   "type": "module",
   "main": "./src/index.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./pure": "./src/pure.js"
   },
   "scripts": {
     "test": "node --test tests/*.test.js",
+    "test:release": "node --test ../experiments/test-js-release.mjs && node ../experiments/test-release-preparation.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

@@ -21,7 +21,15 @@ Available in both JavaScript and Rust.
 
 [![npm version](https://img.shields.io/npm/v/lino-arguments.svg)](https://www.npmjs.com/package/lino-arguments)
 
-The JavaScript version supports Node.js, Bun, and Deno runtimes.
+The JavaScript version supports Node.js, Bun, and Deno runtimes. It accepts
+isolated environment maps and a base directory, selectively maps typed options
+to environment variables, and supports allowlisted secret files. The
+`lino-arguments/pure` entry resolves plain objects in browser/WASM contexts
+without Node filesystem access. See the JavaScript documentation for precedence.
+
+Rust retains its clap/process-based configuration APIs; isolated contexts and
+secret-file settings are currently JavaScript capabilities. This repository has
+no Python package.
 
 ```bash
 npm install lino-arguments
@@ -108,10 +116,12 @@ cargo fmt
 ## Contributing
 
 See the language-specific directories for contribution guidelines:
+
 - [JavaScript](js/)
 - [Rust](rust/)
 
 Both languages use changelog fragments for versioning:
+
 - JavaScript uses `.changeset/` with changesets
 - Rust uses `changelog.d/` with markdown fragments
 
