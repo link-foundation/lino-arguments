@@ -85,7 +85,7 @@ Deno isolation assertion compares key/value equality, ignoring enumeration order
 Deno's process.env proxy can enumerate keys in a different order without mutation.
 An independent experiment confirms no changed host env keys.
 
-Final local results: 91 tests pass on Node (including CI's Node 24), Bun and
+Final local results: 92 tests pass on Node (including CI's Node 24), Bun and
 Deno. Eight hermetic release regressions pass, as do lint, formatting,
 file-size, dependency-freshness and changeset validation checks. The pure
 resolver works under Deno without filesystem or environment permissions.
@@ -110,6 +110,15 @@ to distinguish string-array command aliases from arrays of command modules,
 and preserve builder/handler modules supplied as the third command argument.
 Both regressions failed before the correction; all 91 tests now pass locally,
 including mixed command-module arrays and handler execution.
+
+Both [JavaScript](https://github.com/link-foundation/lino-arguments/actions/runs/37852268917)
+and [Rust](https://github.com/link-foundation/lino-arguments/actions/runs/37852268923)
+CI passed on commit 9dd1363, started at 2026-10-08T22:15:06Z after the commit
+at 22:14:59Z. A final compatibility regression then reproduced rejection of
+repeated array options with generated camelCase aliases: yargs creates equal
+arrays with distinct identities. Result normalization now compares their
+contents, retaining ambiguity errors for different values. All 92 local tests
+pass. Final pushed-revision CI links and readiness are recorded in PR #43.
 
 Actual Changesets tooling prepares 0.4.0 from the retained minor changeset in an
 isolated fixture. Publishing and GitHub releases remain gated on main, so npm

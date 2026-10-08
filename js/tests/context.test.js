@@ -610,6 +610,18 @@ describe('additional precedence and alias regressions', () => {
     assert.equal(calls, 1);
   });
 
+  it('retains repeated array CLI options and their generated aliases', () => {
+    const config = makeConfig({
+      env: {},
+      argv: [...argv, '--tags-list', 'first', '--tags-list', 'second'],
+      lenv: { enabled: false },
+      yargs: ({ yargs }) =>
+        yargs.option('tags-list', { type: 'array', alias: 't' }),
+    });
+    assert.deepEqual(config.tagsList, ['first', 'second']);
+    assert.deepEqual(config.t, ['first', 'second']);
+  });
+
   it('redacts help defaults from manual secret getenv calls', () => {
     const messages = [];
     const original = console.log;

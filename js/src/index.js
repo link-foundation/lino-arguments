@@ -4,6 +4,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import baseGetenv from 'getenv';
 import { resolve } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import {
   toUpperCase,
   toCamelCase,
@@ -360,7 +361,10 @@ export function makeConfig(config = {}) {
   for (const [key, value] of Object.entries(parsed)) {
     if (key !== '_' && key !== '$0') {
       const camelKey = toCamelCase(toKebabCase(key));
-      if (normalized.has(camelKey) && normalized.get(camelKey) !== value) {
+      if (
+        normalized.has(camelKey) &&
+        !isDeepStrictEqual(normalized.get(camelKey), value)
+      ) {
         throw new Error(
           `Ambiguous configuration aliases for ${toUpperCase(key)}`
         );
