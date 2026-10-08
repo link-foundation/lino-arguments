@@ -35,15 +35,25 @@ export function mapEnvironmentOptions(
         apply(configured || parser);
         return configured || parser;
       };
-    if (Array.isArray(args[0])) {
-      args[0] = args[0].map((definition) => ({
-        ...definition,
-        builder: wrap(definition.builder || {}),
-      }));
-    } else if (typeof args[0] === 'object') {
+    if (
+      Array.isArray(args[0]) &&
+      !args[0].every((definition) => typeof definition === 'string')
+    ) {
+      args[0] = args[0].map((definition) =>
+        typeof definition === 'string'
+          ? definition
+          : { ...definition, builder: wrap(definition.builder || {}) }
+      );
+    } else if (!Array.isArray(args[0]) && typeof args[0] === 'object') {
       args[0] = { ...args[0], builder: wrap(args[0].builder || {}) };
     } else if (args[2]) {
-      args[2] = wrap(args[2]);
+      const builder = args[2];
+      args[2] =
+        typeof builder === 'object' &&
+        builder.builder &&
+        typeof builder.handler === 'function'
+          ? { ...builder, builder: wrap(builder.builder) }
+          : wrap(builder);
     }
     return command(...args);
   };

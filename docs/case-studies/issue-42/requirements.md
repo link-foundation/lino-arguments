@@ -85,7 +85,7 @@ Deno isolation assertion compares key/value equality, ignoring enumeration order
 Deno's process.env proxy can enumerate keys in a different order without mutation.
 An independent experiment confirms no changed host env keys.
 
-Final local results: 89 tests pass on Node (including CI's Node 24), Bun and
+Final local results: 91 tests pass on Node (including CI's Node 24), Bun and
 Deno. Eight hermetic release regressions pass, as do lint, formatting,
 file-size, dependency-freshness and changeset validation checks. The pure
 resolver works under Deno without filesystem or environment permissions.
@@ -102,6 +102,14 @@ identify the errors at lines 4632 and 5314. A proxy-based regression reproduces
 this on every platform; legacy getenv now counts actual stored keys and still
 rejects distinct aliases. Legacy test-file names also include process IDs to
 keep simultaneous runtime checks from deleting each other's fixtures.
+
+JavaScript CI run [37851896247](https://github.com/link-foundation/lino-arguments/actions/runs/37851896247)
+passed on commit daca5bb, including all nine Node/Bun/Deno jobs across Linux,
+macOS and Windows. Final API review also found that the mapping wrapper needed
+to distinguish string-array command aliases from arrays of command modules,
+and preserve builder/handler modules supplied as the third command argument.
+Both regressions failed before the correction; all 91 tests now pass locally,
+including mixed command-module arrays and handler execution.
 
 Actual Changesets tooling prepares 0.4.0 from the retained minor changeset in an
 isolated fixture. Publishing and GitHub releases remain gated on main, so npm

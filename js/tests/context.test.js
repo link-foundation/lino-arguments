@@ -563,6 +563,7 @@ describe('additional precedence and alias regressions', () => {
           builder: (yargs) =>
             yargs.option('url', { type: 'string', env: 'APP_URL' }),
         },
+        'status',
       ],
     ]) {
       assert.equal(
@@ -575,6 +576,38 @@ describe('additional precedence and alias regressions', () => {
         'mapped'
       );
     }
+  });
+
+  it('retains string-array command aliases with mapped options', () => {
+    for (const command of ['serve', 'start']) {
+      const config = makeConfig({
+        env: { APP_URL: 'mapped' },
+        argv: [...argv, command],
+        lenv: { enabled: false },
+        yargs: ({ yargs }) =>
+          yargs.command(['serve', 'start'], 'serve', (parser) =>
+            parser.option('url', { type: 'string', env: 'APP_URL' })
+          ),
+      });
+      assert.equal(config.url, 'mapped');
+    }
+  });
+
+  it('retains command builder/handler modules in the third argument', () => {
+    let calls = 0;
+    const config = makeConfig({
+      env: { APP_URL: 'mapped' },
+      argv: [...argv, 'serve'],
+      lenv: { enabled: false },
+      yargs: ({ yargs }) =>
+        yargs.command('serve', 'serve', {
+          builder: (parser) =>
+            parser.option('url', { type: 'string', env: 'APP_URL' }),
+          handler: () => calls++,
+        }),
+    });
+    assert.equal(config.url, 'mapped');
+    assert.equal(calls, 1);
   });
 
   it('redacts help defaults from manual secret getenv calls', () => {
