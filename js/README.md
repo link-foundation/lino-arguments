@@ -190,7 +190,37 @@ To use yargs' built-in behavior, call `.version('1.0.0').help()`. See [examples/
 
 These isolated contexts, pure object resolution, and secret-file settings are JavaScript APIs. The Rust package continues using clap and process environment loaders; its existing automatic option-to-env mapping is separate and does not provide these isolated/secret-file contracts. This repository has no Python implementation.
 
-Direct dependencies use yargs ^18.2.0 and links-notation ^0.25.2. Published lino-env 0.2.8 still depends on links-notation ^0.11.2; that transitive duplicate requires an upstream lino-env release. This package does not force an incompatible override.
+## Grammar compatibility and deduplication
+
+The maintained direct range is **links-notation ^0.25.2**, verified with 0.25.2
+on Node.js, Bun, and Deno. The exported `Parser` uses that grammar;
+`parseLinoArguments` traverses nested line/group nodes in source order and keeps
+its legacy flat token result and invalid-notation line fallback. Parsed tokens
+can be passed after the executable/script entries in `makeConfig`'s `argv`.
+
+A consumer declaring links-notation 0.25.2 shares that parser with this package.
+**A fully deduplicated graph is currently limited by published lino-env 0.2.8**:
+its manifest requires links-notation ^0.11.2, so npm also installs a nested
+0.11.2. These pre-1.0 minor ranges do not overlap. The published lino-env
+JavaScript implementation reads/writes `: ` lines itself and does not import
+either grammar. The duplicate is dependency metadata, with no reproduced
+configuration failure from it.
+
+This release deliberately retains lino-env's published dependency contract.
+Updating this package's direct range alone cannot remove the nested grammar.
+An upstream lino-env release must update or remove its old declaration; the
+coordination is tracked in [lino-env#33](https://github.com/link-foundation/lino-env/issues/33).
+An isolated metadata-only migration to ^0.25.2 produces one parser and passes
+the packed consumer's parser, CLI, `.lenv` roundtrip, exporter, and precedence
+checks. That assessment does not substitute for an upstream release or its
+complete test suite. No override or fork is shipped here.
+
+`.lenv` values retain literal spaces, quotes, colons, hashes and empty strings;
+they are not parsed as general Links Notation. Existing lino-env behavior is
+preserved, including last-value lookup for duplicate keys. Upstream CRLF value
+handling remains tracked separately in [lino-env#32](https://github.com/link-foundation/lino-env/issues/32).
+See the [compatibility assessment](../docs/grammar-compatibility.md) for the
+reproduction, evidence, and migration checks.
 
 ## Development and testing
 
@@ -204,6 +234,7 @@ deno test --allow-read --allow-write --allow-env
 npm run check
 npm run check:dependencies
 npm run test:release
+npm run test:consumer
 # Pure resolver runs without fs/env permissions:
 deno run --no-config ../experiments/test-pure-resolution.mjs
 ```

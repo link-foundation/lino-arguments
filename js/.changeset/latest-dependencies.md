@@ -23,3 +23,9 @@ command positionals, passthrough, and reserved-key collisions.
 
 Refresh links-notation to 0.25.2, optional/dev dotenvx to 2.34.2, and Prettier to
 3.9.10 to satisfy the dependency freshness check after their new releases.
+
+Assess links-notation 0.25.2 parser/CLI/environment interoperability and document
+the deliberate transitive dependency limit: published lino-env 0.2.8 still
+declares ^0.11.2, requiring an upstream release for full deduplication. Add
+cross-runtime regression coverage and a packed consumer CI check, including an
+isolated metadata-only upstream range migration that resolves one latest parser.
