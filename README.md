@@ -26,6 +26,8 @@ isolated environment maps and a base directory, selectively maps typed options
 to environment variables, and supports allowlisted secret files. The
 `lino-arguments/pure` entry resolves plain objects in browser/WASM contexts
 without Node filesystem access. See the JavaScript documentation for precedence.
+Use `makeConfig({ includePositionals: true })` to also return yargs' positional
+command arguments in `config.positionals`.
 
 Rust retains its clap/process-based configuration APIs; isolated contexts and
 secret-file settings are currently JavaScript capabilities. This repository has
