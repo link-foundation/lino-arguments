@@ -221,12 +221,13 @@ export async function loadDotenvx(options = {}) {
  * @param {Object} [config.env] Environment map, or {values, autoMap, enabled, quiet}
  * @param {string} [config.cwd] Base directory (default: process.cwd())
  * @param {string[]} [config.argv] Full process-style argv (default: process.argv)
+ * @param {boolean} [config.includePositionals=false] Include a copy of yargs' _ as positionals
  * @param {Function} [config.yargs] Callback receiving { yargs, getenv }
  * @param {Object} [config.lenv] Default file settings: enabled, path, override, quiet
  * @param {Object} [config.getenv] Callback helper settings: enabled
  * @param {Object} [config.secrets] Allowlist, bounded reader, conflict/newline policies
  * @param {Function} [config.trace] Optional key/source tracing, without values
- * @returns {Object} Parsed camelCase options
+ * @returns {Object} Parsed camelCase options, with positionals when opted in
  */
 export function makeConfig(config = {}) {
   const {
@@ -236,6 +237,7 @@ export function makeConfig(config = {}) {
     secrets,
     argv = process.argv,
     cwd = process.cwd(),
+    includePositionals = false,
   } = config;
   const input = config.env;
   // Keep the deprecated env settings object, while accepting env maps directly.
@@ -377,6 +379,14 @@ export function makeConfig(config = {}) {
         writable: true,
       });
     }
+  }
+  if (includePositionals === true) {
+    if (Object.hasOwn(result, 'positionals')) {
+      throw new Error(
+        'The positionals configuration key is reserved when includePositionals is true'
+      );
+    }
+    result.positionals = [...parsed._];
   }
   return result;
 }
