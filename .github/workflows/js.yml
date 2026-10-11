@@ -16,6 +16,8 @@ on:
       - 'experiments/test-js-release.mjs'
       - 'experiments/test-release-preparation.mjs'
       - 'experiments/test-pure-resolution.mjs'
+      - 'experiments/test-latest-grammar-consumer.mjs'
+      - 'experiments/grammar-consumer.mjs'
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
@@ -25,6 +27,8 @@ on:
       - 'experiments/test-js-release.mjs'
       - 'experiments/test-release-preparation.mjs'
       - 'experiments/test-pure-resolution.mjs'
+      - 'experiments/test-latest-grammar-consumer.mjs'
+      - 'experiments/grammar-consumer.mjs'
   workflow_dispatch:
     inputs:
       release_mode:
@@ -89,6 +93,21 @@ jobs:
         run: npm ci
       - name: Verify JS-only versioning and complete release path
         run: npm run test:release
+
+  grammar-consumer:
+    name: Packed Grammar Consumer
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24.x'
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify published graph and assess upstream range migration
+        run: npm run test:consumer
 
   # === DETECT CHANGES - determines which jobs should run ===
   detect-changes:
@@ -305,9 +324,9 @@ jobs:
   # Release - only runs on main after tests pass (for push events)
   release:
     name: Release
-    needs: [lint, test, dependencies, release-scripts]
+    needs: [lint, test, dependencies, release-scripts, grammar-consumer]
     # Use always() to ensure this job runs even if changeset-check was skipped
-    if: always() && !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.lint.result == 'success' && needs.test.result == 'success' && needs.dependencies.result == 'success' && needs.release-scripts.result == 'success'
+    if: always() && !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.lint.result == 'success' && needs.test.result == 'success' && needs.dependencies.result == 'success' && needs.release-scripts.result == 'success' && needs.grammar-consumer.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -10,6 +10,7 @@
   },
   "scripts": {
     "test": "node --test tests/*.test.js",
+    "test:consumer": "node ../experiments/test-latest-grammar-consumer.mjs && node ../experiments/test-latest-grammar-consumer.mjs --assess-lino-env-range",
     "test:release": "node --test ../experiments/test-js-release.mjs && node ../experiments/test-release-preparation.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
