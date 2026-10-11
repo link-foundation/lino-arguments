@@ -15,3 +15,11 @@ mapping, an importable pure object resolver, and allowlisted bounded secret
 files with redacted failures. Preserve legacy process adapters and document
 source precedence and runtime/language boundaries. Fix JavaScript changeset
 and instant versioning plus GitHub release creation from js/ without Cargo.
+
+Add opt-in `makeConfig({ includePositionals: true })` support, returning a
+`positionals` copy of the final yargs `_` array with its types and order preserved.
+Keep the default options-only result and document process-style argv, named
+command positionals, passthrough, and reserved-key collisions.
+
+Refresh links-notation to 0.25.2, optional/dev dotenvx to 2.34.2, and Prettier to
+3.9.10 to satisfy the dependency freshness check after their new releases.

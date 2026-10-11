@@ -26,6 +26,32 @@ const config = makeConfig({
 
 Without an injected environment, `makeConfig` retains its process defaults: it reads `process.argv`, loads `.lenv` into `process.env`, and returns CLI options with camelCase keys. `.lenv` overrides the existing process environment by default; set `lenv.override: false` to retain existing values, including empty strings. A file selected by `--configuration`/`-c` overrides both. CLI options always have highest priority.
 
+## Positional command arguments
+
+Set `includePositionals: true` to return a `positionals` array alongside the options:
+
+```javascript
+const config = makeConfig({
+  includePositionals: true,
+  lenv: { enabled: false },
+  argv: ['node', 'tool.js', 'collect', 'https://example.com/product'],
+  yargs: ({ yargs }) => yargs.exitProcess(false).help(false).version(false),
+});
+// { positionals: ['collect', 'https://example.com/product'] }
+
+const [command, ...args] = config.positionals;
+```
+
+`argv` is a full process-style array: its first two entries are the executable and script, followed by individual argument tokens. Omit it to use `process.argv`; pass `['node', 'tool.js']` for no arguments. The shell handles quoting, so a filename such as `my products.csv` is one array entry, without enclosing shell quotes.
+
+`positionals` is a copy of `_` from the existing final yargs parse. It preserves yargs' types and source order, including numeric conversion unless disabled with `.parserConfiguration({ 'parse-positional-numbers': false })`. Empty input produces `positionals: []`. Options can appear before or after the command. With the default yargs settings, tokens after `--` join `positionals` without being treated as options; if you enable yargs' `populate--` setting, those tokens remain outside `_` and this array.
+
+Yargs command declarations retain their own behavior. For example, `.command('collect <url>', ...)` consumes the named positional into `config.url`, leaving `config.positionals` as `['collect']`. The array always mirrors the final `parsed._`; it does not reconstruct named arguments. Command handlers and validation callbacks run through the existing parse.
+
+The default (`includePositionals: false`, or omitted) still returns only options. Neither `_` nor `$0` is exposed. When enabled, `positionals` is a reserved result key: an option, alias, or named positional that normalizes to that key causes an error rather than being overwritten. Existing options named `positionals` continue to work when the feature is disabled.
+
+See [examples/positional-commands.js](examples/positional-commands.js) for a runnable CLI with `collect`, `compare`, and `export` commands.
+
 ## Isolated contexts and automatic environment mapping
 
 ```javascript
@@ -127,7 +153,7 @@ The main entry imports Node filesystem adapters through lino-env/yargs. Browser/
 
 ## API reference
 
-`makeConfig({ yargs, env, cwd, argv, lenv, getenv, secrets, trace })` returns parsed camelCase options. `yargs` is an optional callback receiving `{ yargs, getenv }`. `argv` retains the existing full process-style array convention, including executable/script slots. `getenv.enabled: false` disables the callback helper. `lenv.enabled: false` disables default `.lenv` loading; explicit `--configuration` still loads its file. `lenv.quiet: false` enables compatibility loading notices.
+`makeConfig({ yargs, env, cwd, argv, includePositionals, lenv, getenv, secrets, trace })` returns parsed camelCase options, plus `positionals` when `includePositionals: true`. `yargs` is an optional callback receiving `{ yargs, getenv }`. `argv` retains the existing full process-style array convention, including executable/script slots. `getenv.enabled: false` disables the callback helper. `lenv.enabled: false` disables default `.lenv` loading; explicit `--configuration` still loads its file. `lenv.quiet: false` enables compatibility loading notices.
 
 `getenv(name, defaultValue = '', { env, ...contextOptions }?)` uses the process environment by default or an injected map when provided. The type of the default determines conversion: integer defaults require an integer, fractional defaults allow floats, and boolean defaults use boolish conversion. Invalid values return the fallback; empty strings, false and zero are preserved when valid for that type. Ambiguous aliases throw.
 
@@ -164,7 +190,7 @@ To use yargs' built-in behavior, call `.version('1.0.0').help()`. See [examples/
 
 These isolated contexts, pure object resolution, and secret-file settings are JavaScript APIs. The Rust package continues using clap and process environment loaders; its existing automatic option-to-env mapping is separate and does not provide these isolated/secret-file contracts. This repository has no Python implementation.
 
-Direct dependencies use yargs ^18.2.0 and links-notation ^0.23.0. Published lino-env 0.2.8 still depends on links-notation ^0.11.2; that transitive duplicate requires an upstream lino-env release. This package does not force an incompatible override.
+Direct dependencies use yargs ^18.2.0 and links-notation ^0.25.2. Published lino-env 0.2.8 still depends on links-notation ^0.11.2; that transitive duplicate requires an upstream lino-env release. This package does not force an incompatible override.
 
 ## Development and testing
 
