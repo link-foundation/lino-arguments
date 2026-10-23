@@ -72,3 +72,22 @@ after merge. This needs crates.io owner credentials, so it cannot be done from
 this pull request. Until then, releases keep publishing with the token secret
 and print the warning above. Per the policy update, the token secrets must
 **not** be deleted after the first OIDC release.
+
+## JavaScript CI fixed along the way
+
+All CI checks have to pass on this pull request, so these unrelated JavaScript
+failures were fixed here as well:
+
+- The npm `Release` job on `main` (runs 37854450177 and 38162313406) failed at
+  `changeset version` with `Error: spawn deno ENOENT`. Changesets 3 auto-detects
+  its formatter, and `js/deno.json` / `js/deno.lock` make it choose Deno, which
+  that job does not install. `js/.changeset/config.json` now sets
+  `"format": false`, and `scripts/changeset-version.mjs` formats the bump with
+  the project's Prettier. `experiments/test-release-preparation.mjs` now keeps
+  the Deno files in its fixture, puts a failing `deno` on `PATH` and runs the
+  real wrapper. Without the fix it fails at `npx changeset version`.
+- `Packed Grammar Consumer` and `Dependency Freshness` failed after upstream
+  releases: links-notation 0.27.1 is outside `^0.25.2`, and dotenvx, ESLint
+  and eslint-plugin-prettier had newer versions. These were bumped, both locks
+  refreshed, and `docs/grammar-compatibility.md` updated. The Node, Bun and Deno
+  suites and both consumer modes pass.
