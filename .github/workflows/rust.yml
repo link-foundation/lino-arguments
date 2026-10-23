@@ -8,16 +8,20 @@ on:
       - 'rust/**'
       - '.github/workflows/rust.yml'
       - 'scripts/check-rust-dependencies.mjs'
+      - 'scripts/publish-crate.mjs'
       - 'experiments/test-dependency-blockers.mjs'
       - 'experiments/test-latest-rust-consumer.mjs'
+      - 'experiments/test-crates-publish.mjs'
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - 'rust/**'
       - '.github/workflows/rust.yml'
       - 'scripts/check-rust-dependencies.mjs'
+      - 'scripts/publish-crate.mjs'
       - 'experiments/test-dependency-blockers.mjs'
       - 'experiments/test-latest-rust-consumer.mjs'
+      - 'experiments/test-crates-publish.mjs'
   workflow_dispatch:
     inputs:
       release_mode:
@@ -48,8 +52,6 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -Dwarnings
-  # Support both CARGO_REGISTRY_TOKEN (cargo's native env var) and CARGO_TOKEN (for backwards compatibility)
-  CARGO_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN || secrets.CARGO_TOKEN }}
 
 defaults:
   run:
@@ -85,6 +87,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/check-rust-dependencies.mjs
+
+  # === PUBLISH SCRIPT - trusted publishing first, token secret as fallback ===
+  publish-script:
+    name: crates.io Publish Script
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24.x'
+
+      - name: Test crates.io publishing (OIDC first, token fallback)
+        working-directory: .
+        run: node --test experiments/test-crates-publish.mjs
 
   # === DETECT CHANGES - determines which jobs should run ===
   detect-changes:
@@ -269,8 +290,8 @@ jobs:
   build:
     name: Build Package
     runs-on: ubuntu-latest
-    needs: [lint, test, dependencies]
-    if: always() && !cancelled() && needs.lint.result == 'success' && needs.test.result == 'success' && needs.dependencies.result == 'success'
+    needs: [lint, test, dependencies, publish-script]
+    if: always() && !cancelled() && needs.lint.result == 'success' && needs.test.result == 'success' && needs.dependencies.result == 'success' && needs.publish-script.result == 'success'
     steps:
       - uses: actions/checkout@v7.0.1
 
@@ -309,6 +330,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # crates.io trusted publishing (OIDC) via rust-lang/crates-io-auth-action
+      id-token: write
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -367,12 +390,21 @@ jobs:
         if: steps.check.outputs.should_release == 'true'
         run: cargo build --release
 
+      - name: Authenticate with crates.io (trusted publishing)
+        if: steps.check.outputs.should_release == 'true'
+        id: crates_auth
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
+        # Trusted publishing first; the publish step falls back to the token secret.
+        continue-on-error: true
+
       - name: Publish to Crates.io
         if: steps.check.outputs.should_release == 'true'
         id: publish-crate
         working-directory: .
         env:
-          CARGO_TOKEN: ${{ secrets.CARGO_TOKEN }}
+          # Trusted publishing (OIDC) token first, then the token secrets as fallback.
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates_auth.outputs.token || secrets.CARGO_REGISTRY_TOKEN || secrets.CARGO_TOKEN }}
+          CRATES_AUTH_OUTCOME: ${{ steps.crates_auth.outcome }}
           RUST_ROOT: rust
         run: node scripts/publish-crate.mjs
 
@@ -405,6 +437,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # crates.io trusted publishing (OIDC) via rust-lang/crates-io-auth-action
+      id-token: write
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -442,12 +476,21 @@ jobs:
         if: steps.version.outputs.version_committed == 'true' || steps.version.outputs.already_released == 'true'
         run: cargo build --release
 
+      - name: Authenticate with crates.io (trusted publishing)
+        if: steps.version.outputs.version_committed == 'true' || steps.version.outputs.already_released == 'true'
+        id: crates_auth
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
+        # Trusted publishing first; the publish step falls back to the token secret.
+        continue-on-error: true
+
       - name: Publish to Crates.io
         if: steps.version.outputs.version_committed == 'true' || steps.version.outputs.already_released == 'true'
         id: publish-crate
         working-directory: .
         env:
-          CARGO_TOKEN: ${{ secrets.CARGO_TOKEN }}
+          # Trusted publishing (OIDC) token first, then the token secrets as fallback.
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates_auth.outputs.token || secrets.CARGO_REGISTRY_TOKEN || secrets.CARGO_TOKEN }}
+          CRATES_AUTH_OUTCOME: ${{ steps.crates_auth.outcome }}
           RUST_ROOT: rust
         run: node scripts/publish-crate.mjs
 

@@ -1,0 +1,25 @@
+# Excerpt of Rust CI/CD run 37854450254 (main, 2026-10-08, released lino-arguments 0.5.0)
+# Steps per job that received the workflow-level CARGO_TOKEN env:
+     24 Auto Release
+     17 Build Package
+     18 Dependency Freshness
+      3 Detect Changes
+     19 Lint and Format Check
+     19 Test (macos-latest)
+     19 Test (ubuntu-latest)
+     19 Test (windows-latest)
+# Publish step:
+Auto Release	UNKNOWN STEP	2026-10-08T22:41:38.4121194Z   RUSTFLAGS: -Dwarnings
+Auto Release	UNKNOWN STEP	2026-10-08T22:41:38.4121597Z   CARGO_TOKEN: ***
+Auto Release	UNKNOWN STEP	2026-10-08T22:41:38.4121811Z   CARGO_HOME: /home/runner/.cargo
+Auto Release	UNKNOWN STEP	2026-10-08T22:41:38.4122061Z   CARGO_INCREMENTAL: 0
+Auto Release	UNKNOWN STEP	2026-10-08T22:41:38.4122273Z   RUST_ROOT: rust
+Auto Release	UNKNOWN STEP	2026-10-08T22:41:38.4122477Z ##[endgroup]
+Auto Release	UNKNOWN STEP	2026-10-08T22:41:38.4471715Z Using explicitly configured Rust root: rust
+Auto Release	UNKNOWN STEP	2026-10-08T22:41:38.4476376Z Package: lino-arguments@0.5.0
+Auto Release	UNKNOWN STEP	2026-10-08T22:41:38.4476928Z 
+Auto Release	UNKNOWN STEP	2026-10-08T22:41:38.4477257Z === Attempting to publish to crates.io ===
+Auto Release	UNKNOWN STEP	2026-10-08T22:41:38.5025532Z Version not found on crates.io, proceeding with publish...
+Auto Release	UNKNOWN STEP	2026-10-08T22:41:46.1854421Z 
+Auto Release	UNKNOWN STEP	2026-10-08T22:41:46.1855471Z Successfully published lino-arguments@0.5.0 to crates.io
+Auto Release	UNKNOWN STEP	2026-10-08T22:41:46.1857157Z Output: publish_result=success
