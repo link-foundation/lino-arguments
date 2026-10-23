@@ -13,20 +13,27 @@
  * Usage: node scripts/publish-crate.mjs [--token <token>] [--rust-root <path>]
  *
  * Environment variables (checked in order of priority):
- *   - CARGO_REGISTRY_TOKEN: Cargo's native crates.io token (preferred)
+ *   - CARGO_REGISTRY_TOKEN: Cargo's native crates.io token (preferred). In CI
+ *     this is the short-lived trusted publishing (OIDC) token from
+ *     rust-lang/crates-io-auth-action, or the token secret as a fallback.
  *   - CARGO_TOKEN: Alternative token name for backwards compatibility
+ *   - CRATES_AUTH_OUTCOME: Optional outcome of the crates-io-auth-action step
+ *     ('success', 'failure', ...), used to report which credential is used
  *   - RUST_ROOT: Optional path to Rust package root
+ *
+ * The token is handed to cargo through its CARGO_REGISTRY_TOKEN environment
+ * variable, never on the command line, so it cannot appear in process lists
+ * or in the "Command failed" message of a failed publish.
  *
  * Outputs (written to GITHUB_OUTPUT):
  *   - publish_result: 'success', 'already_exists', or 'failed'
  */
 
 import { readFileSync, appendFileSync } from 'fs';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import {
   getRustRoot,
   getCargoTomlPath,
-  needsCd,
   parseRustRootConfig,
 } from './rust-paths.mjs';
 
@@ -64,13 +71,24 @@ function setOutput(key, value) {
 }
 
 /**
- * Execute a shell command, capturing output
- * @param {string} command - The command to execute
- * @param {Object} options - Execution options
+ * Run `cargo publish` in the Rust package root, capturing output.
+ * The token (if any) is passed only through the child's environment.
  * @returns {string} - The command output
  */
-function exec(command, options = {}) {
-  return execSync(command, { encoding: 'utf-8', stdio: 'pipe', ...options });
+function cargoPublish() {
+  const env = { ...process.env };
+  if (token) {
+    env.CARGO_REGISTRY_TOKEN = token;
+  } else {
+    // An empty CARGO_REGISTRY_TOKEN would shadow cargo's own credentials
+    delete env.CARGO_REGISTRY_TOKEN;
+  }
+  return execFileSync('cargo', ['publish', '--allow-dirty'], {
+    cwd: rustRoot,
+    env,
+    encoding: 'utf-8',
+    stdio: 'pipe',
+  });
 }
 
 /**
@@ -94,6 +112,25 @@ function getPackageInfo() {
   };
 }
 
+/**
+ * Report whether trusted publishing (OIDC) or the token secret fallback is used
+ */
+function reportCredentialSource() {
+  const outcome = process.env.CRATES_AUTH_OUTCOME;
+  if (!outcome) {
+    return;
+  }
+  if (outcome === 'success') {
+    console.log('Using the crates.io trusted publishing (OIDC) token');
+    return;
+  }
+  const repository = process.env.GITHUB_REPOSITORY || '<owner>/<repo>';
+  console.log(
+    `::warning::crates.io trusted publishing is unavailable (auth step outcome: ${outcome}), falling back to the CARGO_REGISTRY_TOKEN / CARGO_TOKEN secret. ` +
+      `To publish without the token, add a trusted publisher on crates.io (crate Settings > Trusted Publishing) for repository ${repository} and workflow rust.yml.`
+  );
+}
+
 function main() {
   try {
     const { name, version } = getPackageInfo();
@@ -101,9 +138,11 @@ function main() {
     console.log('');
     console.log('=== Attempting to publish to crates.io ===');
 
+    reportCredentialSource();
+
     if (!token) {
       console.log(
-        '::warning::Neither CARGO_REGISTRY_TOKEN nor CARGO_TOKEN is set, attempting publish without explicit token'
+        '::warning::No crates.io token: trusted publishing did not provide one and neither CARGO_REGISTRY_TOKEN nor CARGO_TOKEN is set, attempting publish without explicit token'
       );
     }
 
@@ -127,18 +166,7 @@ function main() {
     }
 
     try {
-      // Build the cargo publish command
-      let command = 'cargo publish --allow-dirty';
-      if (token) {
-        command += ` --token ${token}`;
-      }
-
-      // For multi-language repos, we need to cd into the rust directory
-      if (needsCd({ rustRoot })) {
-        command = `cd ${rustRoot} && ${command}`;
-      }
-
-      const output = exec(command);
+      const output = cargoPublish();
       console.log(output);
 
       console.log(`Successfully published ${name}@${version} to crates.io`);
