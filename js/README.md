@@ -93,7 +93,7 @@ Automatic mapping is opt-in. It maps only declared options: `job-application-int
 
 Mapped numbers accept finite decimal values; booleans accept `true`/`false` (case insensitive) and `1`/`0`; strings retain empty values. Array options accept comma-separated strings or array-valued object input. Invalid mapped values throw an error naming the key and type, without the value. Unknown environment keys never become options.
 
-Keys normalize across UPPER_CASE, camelCase, kebab-case, snake_case, and PascalCase. Multiple spellings of the same key **within one source** are ambiguous and rejected, even if the values are equal. Different sources can use different spellings and follow precedence. Conflicting option aliases are rejected too. Repeated identical `.lenv` keys retain LinoEnv's last-value behavior.
+Keys normalize across UPPER_CASE, camelCase, kebab-case, snake_case, and PascalCase. Multiple spellings of the same key **within one source** are ambiguous, even if the values are equal. Environment aliases are rejected only when that key is read by `getenv` or option mapping; unrelated aliases such as `http_proxy` + `HTTP_PROXY` or `npm_config_cache` + `NPM_CONFIG_CACHE` do not prevent startup. Explicit CLI values bypass environment mapping and its ambiguity checks. This applies to host and injected environments, including the pure APIs. Configuration and `.lenv` source aliases are validated when the context is created. Different sources can use different spellings and follow precedence. Conflicting option aliases are rejected too. Repeated identical `.lenv` keys retain LinoEnv's last-value behavior.
 
 ## Opt-in secret files
 

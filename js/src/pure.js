@@ -3,6 +3,10 @@ import { toUpperCase, toCamelCase, toKebabCase } from './case.js';
 export * from './case.js';
 
 export function normalizeEnvironment(source = {}) {
+  return snapshotEnvironment(source);
+}
+
+function snapshotEnvironment(source = {}, deferAmbiguity = false) {
   const result = Object.create(null);
   for (const [key, value] of Object.entries(source)) {
     if (value === undefined) {
@@ -10,7 +14,19 @@ export function normalizeEnvironment(source = {}) {
     }
     const name = toUpperCase(key);
     if (Object.hasOwn(result, name)) {
-      throw new Error(`Ambiguous environment aliases for ${name}`);
+      const reject = () => {
+        throw new Error(`Ambiguous environment aliases for ${name}`);
+      };
+      if (!deferAmbiguity) {
+        reject();
+      }
+      // Keep a snapshot of the collision, but reject it only when read.
+      Object.defineProperty(result, name, {
+        get: reject,
+        enumerable: true,
+        configurable: true,
+      });
+      continue;
     }
     result[name] = value;
   }
@@ -73,7 +89,13 @@ export function createConfigContext({
     /^(\/|[A-Za-z]:[/\\])/.test(path) ? path : `${base}/${path}`,
   trace,
 } = {}) {
-  const sources = [env, configuration, lenv].map(normalizeEnvironment);
+  // Host environments often contain unrelated proxy/npm aliases. Configuration
+  // documents remain strict; environment ambiguity is checked on lookup.
+  const sources = [
+    snapshotEnvironment(env, true),
+    normalizeEnvironment(configuration),
+    normalizeEnvironment(lenv),
+  ];
   const schema = secretSchema(secrets);
   const maxBytes = secrets.maxBytes ?? 65536;
   const conflict = secrets.conflict ?? 'error';
@@ -107,15 +129,14 @@ export function createConfigContext({
       }
       let value = source[name];
       if (file && (!direct || conflict === 'file')) {
+        // Resolve aliases outside the reader catch so ambiguity keeps its error.
+        const path = source[fileKey];
         let contents;
         try {
-          if (
-            typeof reader !== 'function' ||
-            typeof source[fileKey] !== 'string'
-          ) {
+          if (typeof reader !== 'function' || typeof path !== 'string') {
             throw new Error();
           }
-          contents = reader(resolvePath(cwd, source[fileKey]), { maxBytes });
+          contents = reader(resolvePath(cwd, path), { maxBytes });
         } catch {
           throw new Error(`Cannot read secret file for ${name}`);
         }
