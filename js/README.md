@@ -93,7 +93,7 @@ Automatic mapping is opt-in. It maps only declared options: `job-application-int
 
 Mapped numbers accept finite decimal values; booleans accept `true`/`false` (case insensitive) and `1`/`0`; strings retain empty values. Array options accept comma-separated strings or array-valued object input. Invalid mapped values throw an error naming the key and type, without the value. Unknown environment keys never become options.
 
-Keys normalize across UPPER_CASE, camelCase, kebab-case, snake_case, and PascalCase. Multiple spellings of the same key **within one source** are ambiguous and rejected, even if the values are equal. Different sources can use different spellings and follow precedence. Conflicting option aliases are rejected too. Repeated identical `.lenv` keys retain LinoEnv's last-value behavior.
+Keys normalize across UPPER_CASE, camelCase, kebab-case, snake_case, and PascalCase. Multiple spellings of the same key **within one source** are ambiguous, even if the values are equal. Environment aliases are rejected only when that key is read by `getenv` or option mapping; unrelated aliases such as `http_proxy` + `HTTP_PROXY` or `npm_config_cache` + `NPM_CONFIG_CACHE` do not prevent startup. Explicit CLI values bypass environment mapping and its ambiguity checks. This applies to host and injected environments, including the pure APIs. Configuration and `.lenv` source aliases are validated when the context is created. Different sources can use different spellings and follow precedence. Conflicting option aliases are rejected too. Repeated identical `.lenv` keys retain LinoEnv's last-value behavior.
 
 ## Opt-in secret files
 
@@ -192,13 +192,13 @@ These isolated contexts, pure object resolution, and secret-file settings are Ja
 
 ## Grammar compatibility and deduplication
 
-The maintained direct range is **links-notation ^0.27.1**, verified with 0.27.1
+The maintained direct range is **links-notation ^0.31.2**, verified with 0.31.2
 on Node.js, Bun, and Deno. The exported `Parser` uses that grammar;
 `parseLinoArguments` traverses nested line/group nodes in source order and keeps
 its legacy flat token result and invalid-notation line fallback. Parsed tokens
 can be passed after the executable/script entries in `makeConfig`'s `argv`.
 
-A consumer declaring links-notation 0.27.1 shares that parser with this package.
+A consumer declaring links-notation 0.31.2 shares that parser with this package.
 **A fully deduplicated graph is currently limited by published lino-env 0.2.8**:
 its manifest requires links-notation ^0.11.2, so npm also installs a nested
 0.11.2. These pre-1.0 minor ranges do not overlap. The published lino-env
@@ -210,7 +210,7 @@ This release deliberately retains lino-env's published dependency contract.
 Updating this package's direct range alone cannot remove the nested grammar.
 An upstream lino-env release must update or remove its old declaration; the
 coordination is tracked in [lino-env#33](https://github.com/link-foundation/lino-env/issues/33).
-An isolated metadata-only migration to ^0.27.1 produces one parser and passes
+An isolated metadata-only migration to ^0.31.2 produces one parser and passes
 the packed consumer's parser, CLI, `.lenv` roundtrip, exporter, and precedence
 checks. That assessment does not substitute for an upstream release or its
 complete test suite. No override or fork is shipped here.

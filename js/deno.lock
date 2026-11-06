@@ -3,13 +3,13 @@
   "specifiers": {
     "npm:@changesets/cli@^3.0.3": "3.0.3",
     "npm:@dotenvx/dotenvx@^2.38.2": "2.38.2",
-    "npm:@eslint/js@^10.0.1": "10.0.1_eslint@10.13.0",
-    "npm:eslint-config-prettier@^10.1.8": "10.1.8_eslint@10.13.0",
-    "npm:eslint-plugin-prettier@^5.5.7": "5.5.7_eslint@10.13.0_eslint-config-prettier@10.1.8__eslint@10.13.0_prettier@3.9.10",
-    "npm:eslint@^10.13.0": "10.13.0",
+    "npm:@eslint/js@^10.0.1": "10.0.1_eslint@10.14.0",
+    "npm:eslint-config-prettier@^10.1.8": "10.1.8_eslint@10.14.0",
+    "npm:eslint-plugin-prettier@^5.5.7": "5.5.7_eslint@10.14.0_eslint-config-prettier@10.1.8__eslint@10.14.0_prettier@3.9.10",
+    "npm:eslint@^10.14.0": "10.14.0",
     "npm:getenv@2": "2.0.0",
     "npm:husky@^9.1.7": "9.1.7",
-    "npm:links-notation@~0.27.1": "0.27.1",
+    "npm:links-notation@~0.31.2": "0.31.2",
     "npm:lino-env@~0.2.8": "0.2.8",
     "npm:lint-staged@^17.6.0": "17.6.0",
     "npm:prettier@^3.9.10": "3.9.10",
@@ -210,7 +210,7 @@
     "@dual-bundle/import-meta-resolve@4.2.1": {
       "integrity": "sha512-id+7YRUgoUX6CgV0DtuhirQWodeeA7Lf4i2x71JS/vtA5pRb/hIGWlw+G6MeXvsM+MXrz0VAydTGElX1rAfgPg=="
     },
-    "@eslint-community/eslint-utils@4.10.1_eslint@10.13.0": {
+    "@eslint-community/eslint-utils@4.10.1_eslint@10.14.0": {
       "integrity": "sha512-cuadcxVFE8sDK6iWJbs8Sn0av2Nrh2QSGQhVlBW9AaAHqHwjWsZHT8LJ4hFGPh7ASBV2deFdM7H/DPjulmh8rg==",
       "dependencies": [
         "eslint",
@@ -240,7 +240,7 @@
         "@types/json-schema"
       ]
     },
-    "@eslint/js@10.0.1_eslint@10.13.0": {
+    "@eslint/js@10.0.1_eslint@10.14.0": {
       "integrity": "sha512-zeR9k5pd4gxjZ0abRoIaxdc7I3nDktoXZk2qOv9gCNWx3mVwEn32VRhyLaRsDiJjTs0xq/T8mfPtyuXu7GWBcA==",
       "dependencies": [
         "eslint"
@@ -410,14 +410,14 @@
     "escape-string-regexp@4.0.0": {
       "integrity": "sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA=="
     },
-    "eslint-config-prettier@10.1.8_eslint@10.13.0": {
+    "eslint-config-prettier@10.1.8_eslint@10.14.0": {
       "integrity": "sha512-82GZUjRS0p/jganf6q1rEO25VSoHH0hKPCTrgillPjdI/3bgBhAE1QzHrHTizjpRvy6pGAvKjDJtk2pF9NDq8w==",
       "dependencies": [
         "eslint"
       ],
       "bin": true
     },
-    "eslint-plugin-prettier@5.5.7_eslint@10.13.0_eslint-config-prettier@10.1.8__eslint@10.13.0_prettier@3.9.10": {
+    "eslint-plugin-prettier@5.5.7_eslint@10.14.0_eslint-config-prettier@10.1.8__eslint@10.14.0_prettier@3.9.10": {
       "integrity": "sha512-WjHyn3GrFd+ZR0rzsLiM4zJZ35PZMOE0SUIxzGmnWNG0126yNfJKJzObmmkYDwHJfGlkz3PSlzyG9ez/LJntwg==",
       "dependencies": [
         "eslint",
@@ -445,8 +445,8 @@
     "eslint-visitor-keys@5.0.1": {
       "integrity": "sha512-tD40eHxA35h0PEIZNeIjkHoDR4YjjJp34biM0mDvplBe//mB+IHCqHDGV7pxF+7MklTvighcCPPZC7ynWyjdTA=="
     },
-    "eslint@10.13.0": {
-      "integrity": "sha512-UohDjD4zSzEwhf58M3O7vc/ycc8O1I7dNlhtD0WxE8Px8EHNJKtUwzBqrzeGhisRuv2ag4sAYswszCJRgKXYUg==",
+    "eslint@10.14.0": {
+      "integrity": "sha512-T0pNsxkb9IKmtQjhpK3d7nWOpFv+YHuMbTJnSVMoQblF0onvXfErrtp4V1jHtsQPan7dKaGVD0q1WCXnzMF31A==",
       "dependencies": [
         "@eslint-community/eslint-utils",
         "@eslint-community/regexpp",
@@ -658,8 +658,8 @@
     "links-notation@0.11.2": {
       "integrity": "sha512-VPyELWBXpaCCiNPVeZhMbG7RuvOQR51nhqELK+s/rbSzKYhSs+tyiSOdQ7z8I7Kh3PLABF3bZETtWSFwx3vFfg=="
     },
-    "links-notation@0.27.1": {
-      "integrity": "sha512-fTmzw/t3AHRTYhR6Ry8hCHzf0eroYGEH/8JsC7FALyGtWxQE0cHdp4YuZnMXqKqmcpMWWiTWoQiIo1D5AvsbQA=="
+    "links-notation@0.31.2": {
+      "integrity": "sha512-DpEZ7MeBQBp02HD4ACuZwzRqMtD2KsgAgb1QwT81eh2OtH4+lb5wGIpMavjVO/ikW3Kuk/Q/72qAfWUlFWOxAQ=="
     },
     "lino-env@0.2.8": {
       "integrity": "sha512-j9JcPo8LWCSlWCO7B1SSL3OlpRc/bGaR/OYnH22DTiANaMaLWan7ebRIo2Pwaw/apcIzdV+UD5EXamdapbn6kA==",
@@ -906,10 +906,10 @@
         "npm:@eslint/js@^10.0.1",
         "npm:eslint-config-prettier@^10.1.8",
         "npm:eslint-plugin-prettier@^5.5.7",
-        "npm:eslint@^10.13.0",
+        "npm:eslint@^10.14.0",
         "npm:getenv@2",
         "npm:husky@^9.1.7",
-        "npm:links-notation@~0.27.1",
+        "npm:links-notation@~0.31.2",
         "npm:lino-env@~0.2.8",
         "npm:lint-staged@^17.6.0",
         "npm:prettier@^3.9.10",
