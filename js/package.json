@@ -47,7 +47,7 @@
   },
   "dependencies": {
     "getenv": "^2.0.0",
-    "links-notation": "^0.27.1",
+    "links-notation": "^0.31.2",
     "lino-env": "^0.2.8",
     "yargs": "^18.2.0"
   },
@@ -63,7 +63,7 @@
     "@changesets/cli": "^3.0.3",
     "@dotenvx/dotenvx": "^2.38.2",
     "@eslint/js": "^10.0.1",
-    "eslint": "^10.13.0",
+    "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.7",
     "husky": "^9.1.7",

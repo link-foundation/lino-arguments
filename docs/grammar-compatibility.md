@@ -2,10 +2,9 @@
 
 Assessed for [lino-arguments#46](https://github.com/link-foundation/lino-arguments/issues/46)
 on 2026-10-11 using npm registry tarballs, not unreleased upstream source.
-Refreshed on 2026-10-23 for links-notation 0.27.1 after its 0.26/0.27 releases
-left the ^0.25.2 range and failed the packed consumer check (see
-[lino-arguments#48](https://github.com/link-foundation/lino-arguments/issues/48)
-and its pull request).
+Refreshed on 2026-11-06 for links-notation 0.31.2 after newer minor releases
+left the ^0.27.1 range and failed the packed consumer check in
+[lino-arguments#51](https://github.com/link-foundation/lino-arguments/pull/51).
 This is a dependency maintenance request; the issue reports passing application
 controls and does not reproduce an application failure.
 
@@ -13,16 +12,15 @@ controls and does not reproduce an application failure.
 
 | Relationship                    | Declared range | Installed version | Result                                           |
 | ------------------------------- | -------------- | ----------------- | ------------------------------------------------ |
-| lino-arguments → links-notation | ^0.27.1        | 0.27.1            | Maintained direct grammar                        |
+| lino-arguments → links-notation | ^0.31.2        | 0.31.2            | Maintained direct grammar                        |
 | lino-arguments → lino-env       | ^0.2.8         | 0.2.8             | Latest published environment library             |
 | lino-env → links-notation       | ^0.11.2        | 0.11.2            | Additional legacy grammar from upstream metadata |
-| Consumer → links-notation       | 0.27.1         | 0.27.1            | Shares the maintained parser with lino-arguments |
+| Consumer → links-notation       | 0.31.2         | 0.31.2            | Shares the maintained parser with lino-arguments |
 
-The direct range was already refreshed on `main` before this assessment; the
-npm and Deno locks both record these versions. The two grammar minor ranges do
+The direct range and npm/Deno locks record these versions. The two grammar minor ranges do
 not overlap because caret ranges below 1.0 retain the minor version boundary.
 A new direct range or `npm dedupe` cannot satisfy lino-env's old declaration
-with 0.27.1.
+with 0.31.2.
 
 The intentional limit is **full graph deduplication until an upstream lino-env
 release updates or removes its declaration**. This package retains both
@@ -32,7 +30,7 @@ environment parser. Track that release in
 
 ## What was verified
 
-The 0.27.1 parser returns nested line/group nodes. The existing iterative legacy
+The 0.31.2 parser returns nested line/group nodes. The existing iterative legacy
 adapter traverses them in source order. Tests cover inline, nested multiline,
 indexed and quoted notation, comments, Unicode and embedded hashes; invalid
 notation still uses the legacy line fallback. The exported `Parser` is the
@@ -86,9 +84,9 @@ The bounded assessment of the proposed upstream range passes:
 
 ```bash
 node experiments/test-latest-grammar-consumer.mjs --assess-lino-env-range
-# Assessing lino-env 0.2.8 with range ^0.27.1.
+# Assessing lino-env 0.2.8 with range ^0.31.2.
 # Packed consumer parser, CLI, lenv roundtrip and precedence pass.
-# One node_modules/links-notation entry at 0.27.1.
+# One node_modules/links-notation entry at 0.31.2.
 ```
 
 This mode copies the installed upstream tarball contents to a temporary

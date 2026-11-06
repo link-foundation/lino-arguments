@@ -36,9 +36,17 @@ try {
   ]) {
     cpSync(join(jsRoot, file), join(directory, file));
   }
-  cpSync(join(jsRoot, '.changeset'), join(directory, '.changeset'), {
-    recursive: true,
-  });
+  // Use a fixture changeset: pending repository changesets may be absent after
+  // release, or request a different bump than this regression expects.
+  mkdirSync(join(directory, '.changeset'));
+  cpSync(
+    join(jsRoot, '.changeset/config.json'),
+    join(directory, '.changeset/config.json')
+  );
+  writeFileSync(
+    join(directory, '.changeset/fixture.md'),
+    "---\n'lino-arguments': patch\n---\n\nRelease preparation regression fixture.\n"
+  );
   // Stand-ins: any `deno` call fails; `npm install --package-lock-only` is
   // recorded instead of touching the registry. npx stays the real one.
   const calls = join(root, 'calls.log');
@@ -58,8 +66,8 @@ try {
     'junction'
   );
   const previous = JSON.parse(readFileSync(join(directory, 'package.json')));
-  const [major, minor] = previous.version.split('.').map(Number);
-  const expected = `${major}.${minor + 1}.0`;
+  const [major, minor, patch] = previous.version.split('.').map(Number);
+  const expected = `${major}.${minor}.${patch + 1}`;
   execFileSync(process.execPath, [versionScript], {
     cwd: directory,
     env: { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}` },
@@ -69,7 +77,9 @@ try {
   });
   const release = JSON.parse(readFileSync(join(directory, 'package.json')));
   assert.equal(release.version, expected);
-  assert.match(readFileSync(join(directory, 'CHANGELOG.md'), 'utf8'), /latest/);
+  const changelog = readFileSync(join(directory, 'CHANGELOG.md'), 'utf8');
+  assert.ok(changelog.includes(`## ${expected}`));
+  assert.match(changelog, /Release preparation regression fixture\./);
   assert.equal(
     readFileSync(calls, 'utf8'),
     'npm install --package-lock-only\n',
